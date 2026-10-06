@@ -21,7 +21,12 @@ jobs:
 
       - name: Install
         working-directory: apps/mobile
-        run: npm ci --no-audit --no-fund
+        run: |
+          for i in 1 2 3; do
+            npm ci --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=30000 && break
+            echo "npm ci attempt $i failed, retrying..."
+            sleep 10
+          done
 
       - name: Unit tests
         working-directory: apps/mobile
