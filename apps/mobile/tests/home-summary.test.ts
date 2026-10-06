@@ -13,6 +13,7 @@ const key = (over: Partial<KeyRow> = {}): KeyRow => ({
   limitReset: 'daily',
   usageMonthly: 40,
   usageDaily: 1.2,
+  usageWeekly: 4,
   expiresAt: null,
   updatedAt: TODAY,
   ...over,

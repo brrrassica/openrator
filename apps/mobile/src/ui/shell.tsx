@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SqlDb } from '../store/db';
 import { SyncEngine } from '../sync/sync-engine';
 import HomePane from './home-pane';
+import SpendPane from './spend-pane';
 import { useTheme } from './theme';
 
 export type Tab = 'home' | 'spend' | 'providers' | 'keys';
@@ -43,12 +44,7 @@ export default function Shell({ engine, db }: Props) {
 
       <View style={styles.body}>
         {tab === 'home' ? <HomePane engine={engine} db={db} /> : null}
-        {tab === 'spend' ? (
-          <Placeholder
-            title="Spend & Endpoint Analytics"
-            text={'30-day spend chart, endpoint breakdown and rollups — shipping in M3.'}
-          />
-        ) : null}
+        {tab === 'spend' ? <SpendPane engine={engine} db={db} /> : null}
         {tab === 'providers' ? (
           <Placeholder
             title="Provider Policy"

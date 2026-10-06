@@ -50,17 +50,18 @@ Sizing: S ≤ 0.5 d · M ≤ 1 d · L ≤ 2 d (dev-days, inclusive of testing).
 | ✅ **Exit** | Home renders from on-device SQLite; stale offline; pull-to-refresh triggers full re-sync. | | |
 
 ## M3 — Spend & Endpoint Analytics (3 d)
+**Status: DONE 2026-10-05** — 30-day spend chart + totals, provider-share donut, endpoint breakdown (rank spend/requests) with status-page links, by-day rollups, no-mgmt fallback w/ key spend windows (added `usage_weekly` to the stored key row, idempotent migration); 59 unit tests; CI green. Known caveats: `/activity` response shape still provisional until a real management key mints it (M0.5A); dashboard figure-parity lives in M5 QA.
 
 > M0.5A — when a management key is available, capture the exact `/activity`
 > response shape and pin down the v0.1 type (currently provisional, §5.3).
 
 | ID | Task | Sizing | Notes |
 |---|---|---|---|
-| M3.1 | Activity sync: pull `/activity` (mgmt key) into `endpoint_activity` + rollups; 30-day window, retention pruning | M | |
-| M3.2 | Spend area chart (30 d) + totals; day filter | M | custom SVG primitives from M2.1 |
-| M3.3 | Endpoint breakdown list (spend/requests rank) with status-page links from `/providers` | M | |
-| M3.4 | No-mgmt fallback view (key spend windows) + explainer card; stale badge; offline rendering | S | |
-| **Exit** | Matches dashboard 30-day activity with mgmt key; fallback + explainer without; offline stale. | | |
+| ✅ M3.1 | Activity sync: pull `/activity` (mgmt key) into `endpoint_activity` + rollups; 30-day window, retention pruning | M | M1 shipped the engine side; M3 wires the UI + adds `usage_weekly` (idempotent column migration) |
+| ✅ M3.2 | Spend area chart (30 d) + totals; day filter | M | 7/14/30 segmented control, custom SVG area from M2.1 |
+| ✅ M3.3 | Endpoint breakdown list (spend/requests rank) with status-page links from `/providers` | M | pure `spend-summary.ts`, unit-tested |
+| ✅ M3.4 | No-mgmt fallback view (key spend windows) + explainer card; stale badge; offline rendering | S | usage today/week/month from `/key` |
+| ✅ **Exit** | Matches dashboard 30-day activity with mgmt key (deferred to M5 QA device pass); fallback + explainer without; offline stale. | | |
 
 ## M4 — Provider Policy & Keys (4–5 d)
 | ID | Task | Sizing | Notes |

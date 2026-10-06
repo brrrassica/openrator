@@ -118,6 +118,7 @@ export class SyncEngine {
         limitReset: key.limitReset,
         usageMonthly: key.usageMonthly,
         usageDaily: key.usageDaily,
+        usageWeekly: key.usageWeekly,
         expiresAt: key.expiresAt,
         updatedAt: new Date().toISOString(),
       });

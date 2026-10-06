@@ -167,6 +167,7 @@ export interface KeyRow {
   limitRemaining: number;
   limitReset: string | null;
   usageMonthly: number;
+  usageWeekly: number;
   usageDaily: number;
   expiresAt: string | null;
   updatedAt: string;

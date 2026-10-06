@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS keys (
   limit_reset TEXT,
   usage_monthly REAL NOT NULL DEFAULT 0,
   usage_daily REAL NOT NULL DEFAULT 0,
+  usage_weekly REAL NOT NULL DEFAULT 0,
   expires_at TEXT,
   updated_at TEXT NOT NULL
 );
@@ -55,6 +56,11 @@ CREATE TABLE IF NOT EXISTS provider_snapshot (
 
 export async function migrate(db: SqlDb): Promise<void> {
   await db.execAsync(SCHEMA_V1);
+  // idempotent column add for pre-existing DBs
+  const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(keys)');
+  if (!cols.some((c) => c.name === 'usage_weekly')) {
+    await db.runAsync('ALTER TABLE keys ADD COLUMN usage_weekly REAL NOT NULL DEFAULT 0');
+  }
 }
 
 // ---- settings ------------------------------------------------------------
@@ -78,8 +84,8 @@ export async function upsertKeyRow(db: SqlDb, row: KeyRow): Promise<void> {
   await db.runAsync(
     `INSERT OR REPLACE INTO keys
       (hash, label, is_management, limit, limit_remaining, limit_reset,
-       usage_monthly, usage_daily, expires_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       usage_monthly, usage_daily, usage_weekly, expires_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     row.hash,
     row.label,
     row.isManagement,
@@ -88,6 +94,7 @@ export async function upsertKeyRow(db: SqlDb, row: KeyRow): Promise<void> {
     row.limitReset,
     row.usageMonthly,
     row.usageDaily,
+    row.usageWeekly,
     row.expiresAt,
     row.updatedAt,
   );
@@ -96,7 +103,7 @@ export async function upsertKeyRow(db: SqlDb, row: KeyRow): Promise<void> {
 export async function getKeyRow(db: SqlDb, hash: string): Promise<KeyRow | null> {
   const r = await db.getFirstAsync<Record<string, unknown>>(
     `SELECT hash, label, is_management, "limit" AS k_limit, limit_remaining, limit_reset,
-            usage_monthly, usage_daily, expires_at, updated_at
+            usage_monthly, usage_daily, usage_weekly, expires_at, updated_at
        FROM keys WHERE hash = ?`,
     hash,
   );
@@ -110,6 +117,7 @@ export async function getKeyRow(db: SqlDb, hash: string): Promise<KeyRow | null>
     limitReset: r.limit_reset as string | null,
     usageMonthly: Number(r.usage_monthly),
     usageDaily: Number(r.usage_daily),
+    usageWeekly: Number(r.usage_weekly ?? 0),
     expiresAt: r.expires_at as string | null,
     updatedAt: String(r.updated_at),
   };
