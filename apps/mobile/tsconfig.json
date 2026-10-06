@@ -2,5 +2,12 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true
-  }
+  },
+  "include": [
+    "src",
+    "tests",
+    "App.tsx",
+    "index.ts",
+    "vitest.config.ts"
+  ]
 }

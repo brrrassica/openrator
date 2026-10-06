@@ -19,15 +19,24 @@ constantly:
 There is **no first-class Android client** for this. The OpenRouter mobile web
 experience is a reskin of the desktop dashboard, not a focused, on-the-go,
 read-and-control surface. The goal of v0.1 is a **single-pane-of-glass Android
-app**: credits at a glance, usage history you can actually browse, and upstream
-provider status + controls — all from one React codebase.
+app**: credits at a glance, spend & endpoint analytics you can actually browse,
+and upstream provider status + controls — all from one React codebase.
+
+> **Pivot (2026-10-05, verified live):** per-request generation history is **not
+> exposed** by the public API — `GET /generation` now requires an `id` and there
+> is no paginated list endpoint (§5.3). v0.1 therefore ships **Spend & Endpoint
+> analytics** (30-day endpoint activity via `/activity`, key spend windows via
+> `/key`, `/credits`) instead of a per-request usage log.
 
 ## 2. Goals (v0.1)
 
 1. **Credits at a glance** — account + per-key credits, spend windows (daily /
    weekly / monthly), limit remaining, key expiry, free-model daily quota.
-2. **Browsable usage logs** — recent generations with model, provider, tokens,
-   cost, latency, and per-day/per-model/per-provider rollups on-device.
+2. **Spend & endpoint analytics** — 30-day spend/requests by endpoint
+   (model+provider) and by day, key spend windows (daily/weekly/monthly), and
+   on-device rollups (per-day/per-endpoint) — fed by `GET /activity` (mgmt key)
+   + `GET /key`; per-request generation logs are out of v0.1 (not exposed by the
+   public API).
 3. **Provider status + controls** — catalog of upstream providers with an
    enabled/disabled posture, routing policy editor (via Presets), and clear
    deep-links to dashboard-only settings.
@@ -55,29 +64,29 @@ provider status + controls — all from one React codebase.
 
 ## 5. Verified API surface (2026-10-05)
 
-> Source: OpenRouter docs & OpenAPI reference blocks. Verify each against a live
-> key in **Spike 0** (roadmap §M0) before coding — especially generation-list
-> pagination and preset edit semantics.
+> Source: OpenRouter docs & OpenAPI reference blocks, **verified against a live
+> standard key on 2026-10-05** (roadmap M0 spikes; details in
+> `docs/03-spike-notes.md`).
 
 ### 5.1 Credits & key status — no management key needed
 | Endpoint | Auth | Returns |
 |---|---|---|
 | `GET /api/v1/key` (a.k.a. `/auth/key`) | any key | `label`, `limit`, `usage`, `usage_daily|weekly|monthly`, `limit_remaining`, `limit_reset` (`daily|weekly|monthly|null`), `byok_usage*`, `is_free_tier`, `is_management_key`, `free_model_daily_requests {used,limit,remaining}`, `expires_at`, `allowed_data_regions`, `workspace_id`, `organization_id` |
+| `GET /api/v1/credits` | any key *(verified 2026-10-05)* | `total_credits`, `total_usage` (account balance). Docs mark it management-only, but a standard key returned 200 live — ship as a benefit that degrades gracefully on 403. |
 
 ### 5.2 Management-key-gated endpoints (v0.1: display gracefully when unavailable)
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/v1/credits` | `total_credits`, `total_usage` (account balance) |
 | `GET /api/v1/keys` / `PATCH /keys/{hash}` / `DELETE /keys/{hash}` / `POST /key` | key CRUD; PATCH body: `label`, `limit`, `limit_reset`, `include_byok_in_limit`, `expires_at` |
 | `GET /api/v1/activity` | 30-day endpoint activity; filters `date`, `api_key_hash`, `user_id`, `group_by=workspace` |
 | `POST /generation/{id}/feedback` | structured feedback (nice-to-have) |
 
-### 5.3 Usage logs (generation history)
+### 5.3 Usage analytics (post-pivot; verified 2026-10-05)
 | Endpoint | Notes |
 |---|---|
-| `GET /api/v1/generation` | List generation history. **Pagination + filter semantics to confirm in Spike 0** (dashboard uses `limit`/`cursor`-style pages; docs do not fully spec a public list method). |
-| `GET /api/v1/generation/{id}` | Per-generation metadata: `id`, `created_at`, `generation_time`, `model`, `provider_name`, `native_tokens_prompt|completion|reasoning|cached`, `tokens_prompt|completion`, `total_cost`, `upstream_inference_cost`, `state`, `app_id` |
-| `GET /api/v1/generation/{id}/content` | Stored prompt/completion/error (privacy-gated; verify availability) |
+| `GET /api/v1/activity` | **Replaces the generation list.** 30-day endpoint activity; filters `date`, `api_key_hash`, `user_id`, `group_by=workspace`. **Management-key only** (standard key → 403, verified). Exact response shape to be captured with a management key (M0.5A follow-up); type defensively. |
+| `GET /api/v1/generation` (list) | **Not public** — `400 id: Invalid input` (verified, incl. `?limit=`/`?cursor=` variants). No public list endpoint exists (`/generations`, `/usage` → 404). Per-request history is dashboard-internal for v0.1. |
+| `GET /api/v1/generation/{id}` | Per-generation metadata, only if the client already holds an id from its own call — **not enumerable**; not used in v0.1. |
 
 ### 5.4 Providers & models
 | Endpoint | Notes |
@@ -138,13 +147,15 @@ a fake global switch). **Decision D3.**
         │ HTTPS (Bearer key)                      │
         ▼                                        ▼
   openrouter.ai/api/v1                    provider status pages
-  /key /credits* /generation              (status_page_url, read-only)
-  /keys* /activity* /providers
-  /models/user /presets/**  (* = mgmt key)
+  /key /credits /activity* /providers     (status_page_url, read-only)
+  /keys* /providers /models/user
+  /presets/**                        (* = mgmt key)
 ```
 
-- **Polling cadence:** credits every 60 s while app foreground / 15 min in
-  background; usage delta pull on open + every 15 min; provider snapshot daily.
+- **Polling cadence:** credits (`/key` + `/credits`) every 60 s while app
+  foreground / 15 min in background; **activity pull on open + every 15 min**
+  (when a management key is present); provider snapshot + `/models/user` cache
+  daily.
 - **Charts:** light-weight custom SVG (no heavy web chart libs) — bar/area for
   spend, donut for provider share.
 - **Concurrency:** one in-flight OpenRouter request at a time per key; small
@@ -163,11 +174,15 @@ a fake global switch). **Decision D3.**
 - Upstream health strip: enabled providers with last-known `state`/status page
   link; pull-to-refresh.
 
-### 8.2 Usage Log
-- Filterable, paginated list (model · provider · app · date range): cost, tokens,
-  latency, state per row.
-- Detail view: full metadata + deep-link to dashboard generation.
-- Rollups tab: by day / by model / by provider / by app (local aggregation).
+### 8.2 Spend & Endpoint Analytics (pivoted from Usage Log)
+- **30-day spend chart** (area) + total requests, from `/activity` where a
+  management key is configured; endpoints grouped as model+provider pairs.
+- **Endpoint breakdown:** rank by spend / requests, with day filter; each row
+  links to the provider's status page (from `/providers`) where available.
+- **No mgmt key:** show the explainer card ("add a management key to unlock
+  30-day analytics") + key spend windows from `/key` as the fallback view.
+- Rollups tab: by day / by endpoint (local aggregation of activity rows).
+- Retention: 30-day window from API; on-device cache pruned beyond 35 days.
 
 ### 8.3 Provider Policy
 - Provider catalog (search/sort): name, slug, datacenter regions, status page link.
@@ -187,7 +202,7 @@ a fake global switch). **Decision D3.**
 | Table | Key fields |
 |---|---|
 | `keys` | hash, label, limit, limit_remaining, usage*, reset, expires_at, is_management |
-| `generations` | gen_id PK, created_at, model, provider, app_id, tokens_p*, tokens_c*, reasoning*, cached*, total_cost, upstream_cost, latency_ms, state |
+| `endpoint_activity` | (day, endpoint, api_key_hash) PK, day, endpoint, api_key_hash, requests, spend_usd, tokens |
 | `daily_rollups` | day PK, spend_usd, requests, tokens, by_model JSON, by_provider JSON |
 | `provider_snapshot` | slug PK, name, regions, status_page, last_ok_at, policy (only/order/ignore per preset) |
 | `settings` | kv: preset_slug_selected, poll intervals, onboarding_done |
@@ -208,7 +223,8 @@ a fake global switch). **Decision D3.**
 1. Fresh install → enter key → Home Pane populated < 10 s (warm cache < 2 s).
 2. Spend trend + top models/providers match dashboard within tokenization winks
    (≤5% known-cost variance acceptable, documented).
-3. Usage log browses ≥ last 7 days with correct rollups; offline shows stale.
+3. Spend & endpoint analytics match the dashboard's 30-day activity figures
+   (with mgmt key); without one, fallback view + explainer; offline shows stale.
 4. Provider toggle on a preset changes `provider.ignore` on OpenRouter and reads
    back correctly; UI rollback on failure.
 5. Key edit/revoke works and reflects on dashboard immediately.
@@ -224,13 +240,25 @@ a fake global switch). **Decision D3.**
 | D4 | Product intent | ✅ confirmed | Personal/internal tool first; productize after v0.2 validation |
 | D5 | Name/branding | ✅ confirmed 2026-10-05 | **OpenRator** (OpenRouter + curator) — branding/marketing still deferred until productize decision |
 | D6 | iOS parity | ✅ confirmed | Out of v0.1 (same codebase keeps it cheap later)
+| D7 | Usage feature scope | ✅ confirmed 2026-10-05 (post-spike) | **Spend & Endpoint analytics** via `/activity` (mgmt key) + `/key`/`/credits`; per-request generation logs out of v0.1 (public API exposes no list) |
 
-## 13. Open questions for Spike 0 (before coding)
+## 13. Spike answers & remaining questions (2026-10-05)
 
-1. Exact behavior of `GET /generation` as a paginated list for a standard key
-   (limits, cursor shape, `has_more`).
-2. Whether `/generation/{id}/content` is readable with a standard key today.
-3. Preset list/update semantics: fields editable via API, versioning behavior.
-4. `/models/user` latency + shape for the policy reflection screen.
-5. Android 14/secure-storage nuances for Expo (hardware-backed keystore vs
-   encrypted app storage) — choose simple-first.
+**Answered (live, standard key):**
+1. `GET /generation` list → **not public** (400 requires `id`); no list.
+2. Per-generation content → untestable without an id; not needed in v0.1.
+3. Presets → create/update/version via `POST /presets/{slug}/chat/completions`
+   (cost-free, config incl. `provider.ignore` persisted); list/get/versions OK;
+   **delete is dashboard-only** (all API delete variants 404).
+4. `/models/user` → 200, 282 models for this account, `total_count`+`links`
+   pagination; includes `top_provider`; no per-endpoint breakdown (use
+   `/models/{author}/{slug}/endpoints` where needed).
+5. Secure storage → **expo-secure-store** (hardware-backed where available,
+   encrypted fallback) for keys; **expo-sqlite** for cache; key never in SQLite.
+
+**Remaining (track at M0.5A when a management key is available):**
+- Exact `/activity` response shape (fields, pagination, endpoint representation)
+  — the v0.1 type is provisional until captured.
+- Whether `/credits` stays open to standard keys (docs say mgmt-only; observed
+  200 on 2026-10-05) — handle both outcomes.
+- Device QA of expo-secure-store on Android 12+ (fallback behavior).

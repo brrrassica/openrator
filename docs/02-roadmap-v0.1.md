@@ -12,29 +12,31 @@ Sizing: S ≤ 0.5 d · M ≤ 1 d · L ≤ 2 d (dev-days, inclusive of testing).
 
 ## M0 — Foundation & API spike (3–4 d)
 **Goal:** de-risk every uncertain API behavior before UI work; stand up repo, CI-ish tooling, device on-ramp.
+**Status: DONE 2026-10-05** — spikes answered live (see `docs/03-spike-notes.md`). Deviations: scaffold used the npm template (`create-expo-app` default hangs — GitHub unreachable from homelab); physical-device smoke test deferred to M5.6; mgmt-key shape capture deferred to M0.5A under M3.
 
 | ID | Task | Sizing | Notes |
 |---|---|---|---|
-| M0.1 | Repo scaffold: `npx create-expo-app` (TS template), git, linter, formatting, pre-commit | S | monorepo-ready layout `apps/mobile` + `shared/` |
-| M0.2 | Device on-ramp: EAS/Android emulator + physical device smoke test ("hello") | M | target Android 12+; document Expo Go vs dev build |
-| M0.3 | **Spike: generation history** — call `GET /generation` with a real key; confirm pagination (limit/cursor, has_more), rate limits, and payload fields vs §5.3 | M | drives §8.2 design |
-| M0.4 | **Spike: presets** — CRUD a throwaway preset with `provider.ignore`; verify list/update/version semantics + propagation to `X-OpenRouter-Preset` consumer | M | drives §8.3 |
-| M0.5 | Spike: `/credits`, `/keys`, `/activity` with a management key; capture 403 behavior for standard key | S | drives §8.1 mgmt banner |
-| M0.6 | Spike: `/models/user` shape + latency; `/providers` fully burned in | S | |
-| M0.7 | Error taxonomy harness: fixture server or recorded responses for 401/402/429/403/5xx; typed client errors | M | drives §10 |
-| M0.8 | Secure-storage decision: Android keystore vs encrypted app storage; spike both | M | D2 validation |
-| **Exit** | All spikes answered and written to `docs/03-spike-notes.md`; app builds to device; typed OpenRouter client skeleton compiling. | | |
+| ✅ M0.1 | Repo scaffold: Expo SDK 57 blank-TS in `apps/mobile`, git, `.gitignore`, initial commit | S | monorepo-ready layout `apps/mobile` + `shared/` |
+| ✅ M0.2 | Device on-ramp: local Android bundle export validated; physical smoke test deferred to M5.6 (headless host) | M | target Android 12+ |
+| ✅ M0.3 | **Spike: generation history** — result: **no public list** (`GET /generation` → 400 requires `id`; `/generations` → 404). §8.2 pivoted to Spend & Endpoint analytics via `/activity` (**D7**). | M | drove §8.2 → see §5.3, 8.2 |
+| ✅ M0.4 | **Spike: presets** — create/update/version via `POST /presets/{slug}/chat/completions` verified (cost-free, `provider.ignore` persisted); list/get/versions OK; delete dashboard-only | M | drives §8.3 |
+| ✅ M0.5 | Spike: `/credits` **200 with standard key** (docs say mgmt-only); `/keys` 401 + `/activity` 403 for standard key (mgmt-gated confirmed) | S | drives §8.1 mgmt banner; shape capture → M0.5A |
+| ✅ M0.6 | Spike: `/models/user` (200, 282 models for this account, `top_provider`, `links` pagination) + `/providers` (112) burned in | S | |
+| ✅ M0.7 | Error taxonomy: 400/401/403/404 verified live; 402/429 per docs with remedy/backoff contract — recorded in spike notes §3 | M | drives §10 |
+| ✅ M0.8 | Secure-storage decision: **expo-secure-store** for keys + **expo-sqlite** for cache (key never in SQLite) | M | D2 validation |
+| ✅ **Exit** | Spikes answered & written to `docs/03-spike-notes.md`; Android bundle compiles; typed OpenRouter client skeleton compiling | | |
 
 ## M1 — Data & client layer (4–5 d)
+**Status: DONE 2026-10-05** — CredentialService (secure store, format-gated) with onboarding screen, typed OpenRouterClient (timeouts/single-flight/retry/error mapping), SyncEngine (poll schedules + staleness), SQLite schema + DAOs, rollups, vitest suite (33 tests), `tsc` clean, Android bundle compiles.
 | ID | Task | Sizing | Notes |
 |---|---|---|---|
-| M1.1 | Credentials service (keystore), onboarding screen (paste key, label, mgmt toggle) | M | paste-warn dialog; never logs key |
-| M1.2 | OpenRouterClient: typed fetch layer, auth header, timeouts, retry/backoff, 402/429 handling | M | single-flight per key |
-| M1.3 | SyncEngine: poll schedules (60 s fg / 15 min bg), delta pulls, staleness tracking | M | |
-| M1.4 | SQLite store: migrations, DAOs for `keys`, `generations`, `daily_rollups`, `provider_snapshot`, `settings` | M | |
-| M1.5 | Rollup computation: day/model/provider/app aggregates + 14-day spend series; idempotent on re-sync | M | |
-| M1.6 | Unit tests: client mapping, rollups, error mapping (golden fixtures from M0.7) | M | |
-| **Exit** | Hey: a key inserted at the door yields a correct SQLite state and typed API responses, fully unit-tested. | | |
+| ✅ M1.1 | Credentials service (keystore), onboarding screen (paste key, label, mgmt toggle) | M | paste-warn dialog; never logs key |
+| ✅ M1.2 | OpenRouterClient: typed fetch layer, auth header, timeouts, retry/backoff, 402/429 handling | M | single-flight per key |
+| ✅ M1.3 | SyncEngine: poll schedules (60 s fg / 15 min bg), delta pulls, staleness tracking; activity pull gated on mgmt key | M | |
+| ✅ M1.4 | SQLite store: migrations, DAOs for `keys`, `endpoint_activity`, `daily_rollups`, `provider_snapshot`, `settings` | M | |
+| ✅ M1.5 | Rollup computation: per-day/per-endpoint aggregates + 14-day spend series; idempotent on re-sync | M | |
+| ✅ M1.6 | Unit tests: client mapping, rollups, error mapping (golden fixtures from M0.7); vitest 5, 33 tests | M | |
+| ✅ **Exit** | A key inserted at the door yields correct SQLite state + typed API responses, fully unit-tested; Android bundle builds. | | |
 
 ## M2 — Home Pane (MVP of the "single pane") (3–4 d)
 | ID | Task | Sizing | Notes |
@@ -46,14 +48,18 @@ Sizing: S ≤ 0.5 d · M ≤ 1 d · L ≤ 2 d (dev-days, inclusive of testing).
 | M2.5 | Pull-to-refresh + stale badge + offline rendering | S | |
 | **Exit** | Home matches dashboard figures (verified against a real account); renders stale offline; pull-to-refresh works. | | |
 
-## M3 — Usage Log (3–4 d)
+## M3 — Spend & Endpoint Analytics (3 d)
+
+> M0.5A — when a management key is available, capture the exact `/activity`
+> response shape and pin down the v0.1 type (currently provisional, §5.3).
+
 | ID | Task | Sizing | Notes |
 |---|---|---|---|
-| M3.1 | Paginated list w/ filters (model, provider, app, range) + infinite scroll | M | |
-| M3.2 | Generation detail view + deep-link to dashboard | S | |
-| M3.3 | Rollups tab (day/model/provider/app) with charts | M | |
-| M3.4 | Incremental sync of new generations + retention cleanup setting | M | |
-| **Exit** | ≥ 7 days of history browsable; filters correct; rollups equal local aggregation of rows. | | |
+| M3.1 | Activity sync: pull `/activity` (mgmt key) into `endpoint_activity` + rollups; 30-day window, retention pruning | M | |
+| M3.2 | Spend area chart (30 d) + totals; day filter | M | custom SVG primitives from M2.1 |
+| M3.3 | Endpoint breakdown list (spend/requests rank) with status-page links from `/providers` | M | |
+| M3.4 | No-mgmt fallback view (key spend windows) + explainer card; stale badge; offline rendering | S | |
+| **Exit** | Matches dashboard 30-day activity with mgmt key; fallback + explainer without; offline stale. | | |
 
 ## M4 — Provider Policy & Keys (4–5 d)
 | ID | Task | Sizing | Notes |
@@ -85,10 +91,10 @@ Sizing: S ≤ 0.5 d · M ≤ 1 d · L ≤ 2 d (dev-days, inclusive of testing).
 | M0 Foundation & spike | 3–4 d |
 | M1 Data & client layer | 4–5 d |
 | M2 Home Pane | 3–4 d |
-| M3 Usage Log | 3–4 d |
+| M3 Spend & endpoint analytics | 3 d |
 | M4 Provider Policy & Keys | 4–5 d |
 | M5 Hardening & release | 4–5 d |
-| **Total** | **~21–27 dev-days** (~4–6 weeks at 0.6 FTE with AI assistance; ~3–4 weeks at full focus) |
+| **Total** | **~21–27 dev-days** (~4–6 weeks at 0.6 FTE with AI assistance; ~3–4 weeks at full focus) — D7 pivot swaps per-request logs for activity analytics |
 
 Parallelizable: M2.1 (chart primitives) and M1.4/M1.5 can start once M1.2 lands.
 M4 depends on M0.4 spikes.

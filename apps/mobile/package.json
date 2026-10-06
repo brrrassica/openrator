@@ -1,6 +1,6 @@
 {
   "name": "openrator",
-  "description": "OpenRator — single-pane OpenRouter dashboard for Android (Expo/React Native).",
+  "description": "OpenRator \u2014 single-pane OpenRouter dashboard for Android (Expo/React Native).",
   "license": "0BSD",
   "version": "0.1.0",
   "main": "index.ts",
@@ -14,12 +14,16 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
   }
 }

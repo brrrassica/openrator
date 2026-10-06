@@ -8,7 +8,7 @@ oversight — built with Expo / React Native, BYOK on-device (no backend in v0.1
 
 ## Status
 
-- **v0.1 planning** — specification and roadmap locked 2026-10-05.
+- **M0 (foundation) in progress** — scaffold complete (SDK 57, blank-TS, `apps/mobile`), API spikes verified 2026-10-05 (see `docs/03-spike-notes.md`).
 - Estimates: ~21–27 dev-days.
 
 ## Docs
