@@ -29,12 +29,13 @@ import { useTheme } from './theme';
 interface Props {
   engine: SyncEngine;
   db: SqlDb;
+  onSignOut?: () => void;
 }
 
 const RESETS = ['daily', 'weekly', 'monthly'] as const;
 type Reset = (typeof RESETS)[number] | '';
 
-export default function KeysPane({ engine, db }: Props) {
+export default function KeysPane({ engine, db, onSignOut }: Props) {
   const t = useTheme();
   const [key, setKey] = useState<KeyRow | null>(null);
   const [mgmt, setMgmt] = useState<boolean | null>(null);

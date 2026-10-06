@@ -33,9 +33,10 @@ const TITLES: Record<Tab, string> = {
 interface Props {
   engine: SyncEngine;
   db: SqlDb;
+  onSignOut?: () => void;
 }
 
-export default function Shell({ engine, db }: Props) {
+export default function Shell({ engine, db, onSignOut }: Props) {
   const t = useTheme();
   const [tab, setTab] = useState<Tab>('home');
 
@@ -49,7 +50,7 @@ export default function Shell({ engine, db }: Props) {
         {tab === 'home' ? <HomePane engine={engine} db={db} /> : null}
         {tab === 'spend' ? <SpendPane engine={engine} db={db} /> : null}
         {tab === 'providers' ? <ProvidersPane engine={engine} db={db} /> : null}
-        {tab === 'keys' ? <KeysPane engine={engine} db={db} /> : null}
+        {tab === 'keys' ? <KeysPane engine={engine} db={db} onSignOut={onSignOut} /> : null}
       </View>
 
       <View style={[styles.tabbar, { backgroundColor: t.card, borderTopColor: t.border }]}>

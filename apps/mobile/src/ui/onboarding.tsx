@@ -46,6 +46,13 @@ export default function OnboardingScreen({ creds, onDone, onError }: Props) {
         device and sent only to openrouter.ai over TLS. OpenRator never logs it.
       </Text>
 
+      <View style={styles.pasteWarn}>
+        <Text style={styles.pasteWarnText}>
+          Paste warning: this key will be saved to this device’s secure store.
+          It also stays in your clipboard/history — clear it there too.
+        </Text>
+      </View>
+
       <Text style={styles.fieldLabel}>API key</Text>
       <TextInput
         style={styles.input}
@@ -95,6 +102,16 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, padding: 24, justifyContent: 'center' },
   title: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
   body: { fontSize: 14, lineHeight: 20, marginBottom: 16, color: '#666' },
+  pasteWarn: {
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#b45309',
+    borderRadius: 8,
+    backgroundColor: '#fdf3e7',
+    padding: 10,
+    marginBottom: 12,
+  },
+  pasteWarnText: { fontSize: 12, lineHeight: 18, color: '#7a4a12' },
   fieldLabel: { fontSize: 13, fontWeight: '600', marginTop: 8 },
   input: {
     borderWidth: 1,

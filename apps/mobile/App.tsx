@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { CredentialService, createSecureKeyValueStore } from './src/core/credentials';
 import { OpenRouterClient } from './src/core/client';
-import { migrate } from './src/store/daos';
+import { migrate, setSetting } from './src/store/daos';
 import { openDb, SqlDb } from './src/store/db';
 import { SyncEngine } from './src/sync/sync-engine';
 import OnboardingScreen from './src/ui/onboarding';
@@ -108,7 +108,20 @@ function Inner() {
   }
 
   if (stage === 'ready' && engine && ctx) {
-    return <Shell engine={engine} db={ctx.db} />;
+    return (
+      <Shell
+        engine={engine}
+        db={ctx.db}
+        onSignOut={() => {
+          engine.stop();
+          void ctx.creds.clear();
+          void setSetting(ctx.db, 'credential.key_hash', '');
+          void setSetting(ctx.db, 'credential.key_prefix', '');
+          setEngine(null);
+          setStage('onboarding');
+        }}
+      />
+    );
   }
 
   return null;
