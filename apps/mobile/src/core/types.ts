@@ -172,3 +172,30 @@ export interface KeyRow {
   expiresAt: string | null;
   updatedAt: string;
 }
+
+/** GET /api/v1/keys → data[] (mgmt-key only; 401 for standard keys). */
+export interface AdminKey {
+  id: string;
+  hash: string;
+  label: string;
+  created: number;
+  limit: number;
+  limitRemaining: number;
+  limitReset: ResetWindow;
+  usage: number;
+  usageDaily: number;
+  usageWeekly: number;
+  usageMonthly: number;
+  includeByokInLimit: boolean;
+  expiresAt: string | null;
+  isManagementKey?: boolean;
+  isProvisioningKey?: boolean;
+  [k: string]: unknown;
+}
+
+/** POST /api/v1/keys → data; `key` holds the one-time full secret. */
+export interface AdminKeyCreated extends Partial<AdminKey> {
+  id: string;
+  /** Full key value — shown once, never persisted by OpenRator. */
+  key: string;
+}

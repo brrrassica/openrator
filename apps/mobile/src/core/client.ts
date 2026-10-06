@@ -13,6 +13,8 @@ import {
 } from './errors';
 import {
   ActivityPage,
+  AdminKey,
+  AdminKeyCreated,
   Credits,
   KeyStatus,
   ModelRef,
@@ -70,6 +72,19 @@ export function mapKeyStatus(src: Record<string, unknown>): KeyStatus {
       remaining: Number(f.remaining ?? 0),
     },
   };
+}
+
+/** Shared sanity check for any key value (create-flow test, M4.5). */
+export function testRawKey(
+  rawKey: string,
+  opts?: { baseUrl?: string; fetchFn?: ClientOptions['fetchFn'] },
+): Promise<KeyStatus> {
+  const client = new OpenRouterClient({
+    apiKey: rawKey,
+    baseUrl: opts?.baseUrl,
+    fetchFn: opts?.fetchFn,
+  });
+  return client.getKeyStatus();
 }
 
 export class OpenRouterClient {
@@ -239,6 +254,59 @@ export class OpenRouterClient {
         `/presets/${encodeURIComponent(slug)}/chat/completions`,
         body,
       ).then((r) => mapAs<Preset>(r.data)),
+    );
+  }
+
+  // ---- management-key plane (401/403 with a standard key, R2 of spec) ----
+
+  listAdminKeys(): Promise<AdminKey[]> {
+    return this.singleFlight(() =>
+      this.request<{ data: unknown[] }>('GET', '/keys').then((r) =>
+        pickList(r).map((x) => mapAs<AdminKey>(x)),
+      ),
+    );
+  }
+
+  /** POST /keys — body uses the documented snake_case wire fields. */
+  createAdminKey(body: {
+    name?: string;
+    limit?: number;
+    limitReset?: string;
+    expiresAt?: string;
+  }): Promise<AdminKeyCreated> {
+    const wire: Record<string, unknown> = {};
+    if (body.name !== undefined) wire.name = body.name;
+    if (body.limit !== undefined) wire.limit = body.limit;
+    if (body.limitReset !== undefined) wire.limit_reset = body.limitReset;
+    if (body.expiresAt !== undefined) wire.expires_at = body.expiresAt;
+    return this.singleFlight(() =>
+      this.request<{ data: Record<string, unknown> }>('POST', '/keys', wire).then((r) =>
+        mapAs<AdminKeyCreated>(r.data),
+      ),
+    );
+  }
+
+  /** PATCH /keys/{id} — body uses the documented snake_case wire fields. */
+  patchAdminKey(
+    id: string,
+    body: { label?: string; limit?: number; limitReset?: string; expiresAt?: string },
+  ): Promise<AdminKey> {
+    const wire: Record<string, unknown> = {};
+    if (body.label !== undefined) wire.label = body.label;
+    if (body.limit !== undefined) wire.limit = body.limit;
+    if (body.limitReset !== undefined) wire.limit_reset = body.limitReset;
+    if (body.expiresAt !== undefined) wire.expires_at = body.expiresAt;
+    return this.singleFlight(() =>
+      this.request<{ data: Record<string, unknown> }>('PATCH', `/keys/${encodeURIComponent(id)}`, wire).then(
+        (r) => mapAs<AdminKey>(r.data),
+      ),
+    );
+  }
+
+  /** DELETE /keys/{id} — destructive; callers double-confirm. */
+  async deleteAdminKey(id: string): Promise<void> {
+    await this.singleFlight(() =>
+      this.request<unknown>('DELETE', `/keys/${encodeURIComponent(id)}`),
     );
   }
 }
