@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# OpenRator — versioned post-commit hook: push to Gitea after each commit.
+# Enabled via `git config core.hooksPath .githooks`.
+"$(git rev-parse --show-toplevel)/scripts/sync-gitea.sh" &
+disown || true
+exit 0

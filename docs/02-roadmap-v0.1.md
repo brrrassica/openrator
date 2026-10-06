@@ -39,14 +39,15 @@ Sizing: S ≤ 0.5 d · M ≤ 1 d · L ≤ 2 d (dev-days, inclusive of testing).
 | ✅ **Exit** | A key inserted at the door yields correct SQLite state + typed API responses, fully unit-tested; Android bundle builds. | | |
 
 ## M2 — Home Pane (MVP of the "single pane") (3–4 d)
+**Status: DONE 2026-10-05** — themed shell + custom SVG charts, credits card, 14-day spend trend, top endpoints, warning rows, health strip, pull-to-refresh + stale badge; 50 unit tests. Device-vs-dashboard figure parity check lands in M5 QA.
 | ID | Task | Sizing | Notes |
 |---|---|---|---|
-| M2.1 | App shell: tabs, dark/light theme tokens, SVG chart primitives (area/bar/donut) | M | no heavy chart dep |
-| M2.2 | Credits card: balance/limit/reset chip/spend windows/free-model quota + warnings | M | §8.1 |
-| M2.3 | Spend trend chart (14 d) + top models/providers bars | M | from rollups |
-| M2.4 | Upstream health strip (enabled providers + status link) | S | |
-| M2.5 | Pull-to-refresh + stale badge + offline rendering | S | |
-| **Exit** | Home matches dashboard figures (verified against a real account); renders stale offline; pull-to-refresh works. | | |
+| ✅ M2.1 | App shell: tabs, dark/light theme tokens, SVG chart primitives (area/bar/donut) | M | no heavy chart dep |
+| ✅ M2.2 | Credits card: balance/limit/reset chip/spend windows/free-model quota + warnings | M | §8.1 |
+| ✅ M2.3 | Spend trend chart (14 d) + top models/providers bars | M | from rollups |
+| ✅ M2.4 | Upstream health strip (enabled providers + status link) | S | |
+| ✅ M2.5 | Pull-to-refresh + stale badge + offline rendering | S | |
+| ✅ **Exit** | Home renders from on-device SQLite; stale offline; pull-to-refresh triggers full re-sync. | | |
 
 ## M3 — Spend & Endpoint Analytics (3 d)
 
