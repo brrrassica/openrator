@@ -471,8 +471,9 @@ const styles = StyleSheet.create({
   segment: {
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    // ≥ 40 px touch target (WCAG 2.5.5)
+    paddingHorizontal: 13,
+    paddingVertical: 9,
     marginRight: 8,
   },
   input: {

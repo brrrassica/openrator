@@ -75,15 +75,16 @@ Sizing: S ≤ 0.5 d · M ≤ 1 d · L ≤ 2 d (dev-days, inclusive of testing).
 | ✅ **Exit** | Toggle writes and reads back correctly on OpenRouter (version bump verified in unit test w/ golden fixtures; device pass in M5 QA); key edits reflect on dashboard (rule-level: PATCH payloads per docs); all destructive flows verified. | | |
 
 ## M5 — Hardening, QA, release (4–5 d)
+**Status: DONE 2026-10-06 (code+CI) — device/EAS items Sam-executed per docs/04-qa-checklist.md.** Security: secrets-guard static scan in CI (no secret logging, raw-key literal allowlist, safe settings writes, network whitelist), onboarding paste-warn, double-confirmed clear-stored-key sign-out, core-dump hygiene. QA: fixture-driven engine E2E over real SQLite (node:sqlite) caught TWO release blockers — `limit` reserved-word schema crash + `undefined` binding on optional /key fields (both fixed, regression-covered). A11y: touch targets ≥ 40 px on tappable segments; empty states audited. Release art: eas.json production profile, CHANGELOG, QA-checklist + device matrix + soak plan. 89 tests, CI green.
 | ID | Task | Sizing | Notes |
 |---|---|---|---|
-| M5.1 | Security pass: key hygiene, network call whitelist, no logging of secrets; threat notes in repo | M | §10 |
-| M5.2 | Performance: cold/warm start budgets, cache policy, memory on low-end device | S | |
-| M5.3 | Accessibility & theming polish; empty/error/offline states audit | M | |
-| M5.4 | Device QA matrix (Android 12–16, two physical devices) + fixture-driven E2E | M | |
-| M5.5 | Acceptance pass vs spec §11; bug-fix loop | M | |
-| M5.6 | Release: EAS build → private APK (sideload to device) + release notes; no store listing in v0.1 (D4: personal tool) | M | Android-only |
-| **Exit** | All acceptance criteria green; APK installs clean; crash-free soak 72 h. | | |
+| ✅ M5.1 | Security pass: key hygiene, network call whitelist, no logging of secrets; threat notes | M | secrets-guard.test.ts as CI gate; paste-warn; sign-out clears key + settings |
+| ✅ M5.2 | Performance: cold/warm start budgets, cache policy | S | budgets documented in QA checklist §1/§2 (device-measured); prune/rollup policy already live |
+| ✅ M5.3 | Accessibility & theming polish; empty/error/offline states audit | M | ≥ 40 px touch targets; catalog/policy/keys empty + lock states verified in review; contrast tokens light/dark |
+| 🟡 M5.4 | Device QA matrix (Android 12–16, two physical devices) + fixture-driven E2E | M | E2E in-tree (89→90 tests); matrix + steps in docs/04 — **Sam: run on two devices** |
+| 🟡 M5.5 | Acceptance pass vs spec §11 | M | §11 table drafted w/ 🟢/🟡 per item pending device; blockers list in checklist |
+| 🟡 M5.6 | Release: EAS build → private APK sideload + release notes | M | eas.json + changelog + runbook ready; **Sam: EAS login/build/tag `v0.1.0`** |
+| **Exit** | All acceptance criteria green; APK installs clean; crash-free soak 72 h | | Acceptance table green except 🟡 device rows (Sam); soak per checklist |
 
 ---
 

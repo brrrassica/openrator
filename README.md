@@ -12,9 +12,17 @@ v0.1).
 ## Status
 
 - **M0 ✅** Foundation & API spikes — verified live 2026-10-05 (`docs/03-spike-notes.md`). Generation-list spike **pivoted the product to Spend & Endpoint analytics** (D7).
-- **M1 ✅** Data & client layer — secure-store credentials, typed API client, sync engine, SQLite DAOs, rollups (50 unit tests).
-- **M2 ✅** Home Pane — themed shell, custom SVG charts, credits card, 14-day spend trend, top endpoints, health strip, pull-to-refresh.
-- **M3 →** Spend & Endpoint analytics (30-day activity, mgmt key).
+- **M1 ✅** Data & client layer — secure-store credentials, typed API client, sync engine, SQLite DAOs, rollups.
+- **M2 ✅** Home Pane — themed shell, custom SVG charts, credits card, 14-day spend trend, health strip, pull-to-refresh.
+- **M3 ✅** Spend & Endpoint analytics (30-day area chart, endpoint/provider breakdowns, no-mgmt fallback).
+- **M4 ✅** Provider Policy & Keys — catalog, preset routing editor with optimistic writes, mgmt-key CRUD + create/reveal flow.
+- **M5 🔜** Hardening, QA, release — secrets guard + engine E2E shipped; device matrix + EAS build are the last stretch (`docs/04-qa-checklist.md`).
+
+## Release (v0.1)
+
+Version `0.1.0` builds via `eas build -p production` (production channel, Android
+APK for sideload — no store listing in v0.1). Release runbook: `docs/04-qa-checklist.md` §4.
+Physical-device-only items (mgmt-key acceptance, soak) are tracked there.
 
 ## Repos & CI
 
@@ -28,6 +36,8 @@ v0.1).
 - [`docs/02-roadmap-v0.1.md`](docs/02-roadmap-v0.1.md) — v0.1 roadmap (M0–M5), effort, exit criteria
 - [`docs/03-spike-notes.md`](docs/03-spike-notes.md) — live API spike results (2026-10-05)
 - [`docs/04-ci-notes.md`](docs/04-ci-notes.md) — Gitea + Actions setup & ops notes
+- [`docs/04-qa-checklist.md`](docs/04-qa-checklist.md) — v0.1 acceptance + device matrix (M5)
+- [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — release notes
 
 ## Development
 

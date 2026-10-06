@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
   cardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
   notice: { borderRadius: 8, borderWidth: 1, padding: 8, marginBottom: 10 },
-  chip: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8 },
+  chip: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, marginRight: 8 },
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   providerRow: {
     flexDirection: 'row',

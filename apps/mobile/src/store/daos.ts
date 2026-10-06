@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS keys (
   hash TEXT PRIMARY KEY,
   label TEXT NOT NULL,
   is_management INTEGER NOT NULL DEFAULT 0,
-  limit REAL NOT NULL DEFAULT 0,
+  "limit" REAL NOT NULL DEFAULT 0,
   limit_remaining REAL NOT NULL DEFAULT 0,
   limit_reset TEXT,
   usage_monthly REAL NOT NULL DEFAULT 0,
@@ -83,7 +83,7 @@ export async function setSetting(db: SqlDb, key: string, value: string): Promise
 export async function upsertKeyRow(db: SqlDb, row: KeyRow): Promise<void> {
   await db.runAsync(
     `INSERT OR REPLACE INTO keys
-      (hash, label, is_management, limit, limit_remaining, limit_reset,
+      (hash, label, is_management, "limit", limit_remaining, limit_reset,
        usage_monthly, usage_daily, usage_weekly, expires_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     row.hash,
@@ -91,11 +91,11 @@ export async function upsertKeyRow(db: SqlDb, row: KeyRow): Promise<void> {
     row.isManagement,
     row.limit,
     row.limitRemaining,
-    row.limitReset,
+    row.limitReset ?? null,
     row.usageMonthly,
     row.usageDaily,
     row.usageWeekly,
-    row.expiresAt,
+    row.expiresAt ?? null,
     row.updatedAt,
   );
 }
