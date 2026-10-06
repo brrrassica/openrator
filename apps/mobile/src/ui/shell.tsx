@@ -9,6 +9,9 @@ import { SqlDb } from '../store/db';
 import { SyncEngine } from '../sync/sync-engine';
 import HomePane from './home-pane';
 import SpendPane from './spend-pane';
+import CatalogPane from './catalog-pane';
+import PolicyPane from './policy-pane';
+import KeysPane from './keys-pane';
 import { useTheme } from './theme';
 
 export type Tab = 'home' | 'spend' | 'providers' | 'keys';
@@ -45,18 +48,8 @@ export default function Shell({ engine, db }: Props) {
       <View style={styles.body}>
         {tab === 'home' ? <HomePane engine={engine} db={db} /> : null}
         {tab === 'spend' ? <SpendPane engine={engine} db={db} /> : null}
-        {tab === 'providers' ? (
-          <Placeholder
-            title="Provider Policy"
-            text={'Routing policy editor via presets + account-wide prefs — shipping in M4.'}
-          />
-        ) : null}
-        {tab === 'keys' ? (
-          <Placeholder
-            title="Keys"
-            text={'Key card, list and CRUD with a management key — shipping in M4.'}
-          />
-        ) : null}
+        {tab === 'providers' ? <ProvidersPane engine={engine} db={db} /> : null}
+        {tab === 'keys' ? <KeysPane engine={engine} db={db} /> : null}
       </View>
 
       <View style={[styles.tabbar, { backgroundColor: t.card, borderTopColor: t.border }]}>
@@ -79,6 +72,44 @@ export default function Shell({ engine, db }: Props) {
             </Pressable>
           );
         })}
+      </View>
+    </View>
+  );
+}
+
+/** Providers tab: catalog (browse) ⇄ policy (routing editor). */
+function ProvidersPane({ engine, db }: { engine: SyncEngine; db: SqlDb }) {
+  const t = useTheme();
+  const [view, setView] = useState<'catalog' | 'policy'>('catalog');
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={[styles.paneToggle, { backgroundColor: t.card, borderBottomColor: t.border }]}>
+        {(['catalog', 'policy'] as const).map((v) => (
+          <Pressable
+            key={v}
+            style={[styles.seg, { backgroundColor: v === view ? t.accent + '22' : 'transparent' }]}
+            onPress={() => setView(v)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: v === view }}
+          >
+            <Text
+              style={{
+                color: v === view ? t.accent : t.subtext,
+                fontSize: 13,
+                fontWeight: v === view ? '700' : '400',
+              }}
+            >
+              {v === 'catalog' ? 'Catalog' : 'Policy'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <View style={{ flex: 1 }}>
+        {view === 'catalog' ? (
+          <CatalogPane engine={engine} db={db} />
+        ) : (
+          <PolicyPane engine={engine} db={db} />
+        )}
       </View>
     </View>
   );
@@ -110,5 +141,12 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 8 },
+  paneToggle: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  seg: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6, marginRight: 8 },
   placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
 });

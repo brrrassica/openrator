@@ -73,7 +73,7 @@ export class SyncEngine {
   private listeners = new Set<() => void>();
 
   constructor(
-    private readonly client: OpenRouterClient,
+    readonly client: OpenRouterClient,
     private readonly creds: CredentialService,
     private readonly db: SqlDb,
     private readonly cb: SyncCallbacks = {},
@@ -248,6 +248,11 @@ export class SyncEngine {
         void this.refreshModels().catch(() => undefined);
       }),
     ];
+  }
+
+  /** Any key value sanity check (create-flow test, M4.5). */
+  isManagementKey(): Promise<boolean> {
+    return this.creds.isManagementKey();
   }
 
   getStatus(): SyncStatus {

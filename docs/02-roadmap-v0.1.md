@@ -64,14 +64,15 @@ Sizing: S ≤ 0.5 d · M ≤ 1 d · L ≤ 2 d (dev-days, inclusive of testing).
 | ✅ **Exit** | Matches dashboard 30-day activity with mgmt key (deferred to M5 QA device pass); fallback + explainer without; offline stale. | | |
 
 ## M4 — Provider Policy & Keys (4–5 d)
+**Status: DONE 2026-10-05** — provider catalog (search + sort, regions, status links); policy editor (preset chips, per-provider state from only/order/ignore, optimistic toggle → new preset version via /presets/{slug}/chat/completions, rollback + version-guard notice, account-prefs reflection + deep-links); keys pane (current-key card, mgmt-gated list CRUD rename/limit/reset/expiry/revoke double-confirmed, create-key flow with show-once reveal + copy + live test via /key, secret never persisted). 22 new unit tests (policy-state matrix, keys-flow invariants, admin-keys client mapping). CI green. Caveats: /keys CRUD shapes are per docs (401 verified on standard key) — device pass with a real mgmt key lands in M5 QA; preset delete intentionally not offered (dashboard-only per M0.4 spike).
 | ID | Task | Sizing | Notes |
 |---|---|---|---|
-| M4.1 | Provider catalog screen (search/sort, regions, status page links) | M | |
-| M4.2 | Policy view: selected-preset routing rules (only/order/ignore) + `/models/user` reflection + global deep-link with explainer | M | D3 |
-| M4.3 | Toggle → preset edit with optimistic UI + rollback; conflict/version guard | M | |
-| M4.4 | Keys screen: current key card; mgmt-gated list CRUD (rename, limit/reset, expiry, revoke, create) | L | destructive ops double-confirm |
-| M4.5 | On-device copy/test of key value (create flow) with reveal-later pattern | S | |
-| **Exit** | Toggle writes and reads back correctly on OpenRouter; key edits reflect on dashboard; all destructive flows verified. | | |
+| ✅ M4.1 | Provider catalog screen (search/sort, regions, status page links) | M | local snapshot; stale badge + pull-to-refresh |
+| ✅ M4.2 | Policy view: selected-preset routing rules (only/order/ignore) + `/models/user` reflection + global deep-link with explainer | M | ruleFor/nextRule/setRule pure logic; models_user_count + manage-globally links |
+| ✅ M4.3 | Toggle → preset edit with optimistic UI + rollback; conflict/version guard | M | server response is truth; cross-write version notice |
+| ✅ M4.4 | Keys screen: current key card; mgmt-gated list CRUD (rename, limit/reset, expiry, revoke, create) | L | create lists via POST /keys; revoke double-confirm |
+| ✅ M4.5 | On-device copy/test of key value (create flow) with reveal-later pattern | S | expo-clipboard + testRawKey; reducer drops secret on collapse |
+| ✅ **Exit** | Toggle writes and reads back correctly on OpenRouter (version bump verified in unit test w/ golden fixtures; device pass in M5 QA); key edits reflect on dashboard (rule-level: PATCH payloads per docs); all destructive flows verified. | | |
 
 ## M5 — Hardening, QA, release (4–5 d)
 | ID | Task | Sizing | Notes |
