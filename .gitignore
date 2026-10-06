@@ -4,5 +4,5 @@ dist/
 *.log
 .env*
 .DS_Store
-core*
+core.[0-9]*
 dist-ci/
