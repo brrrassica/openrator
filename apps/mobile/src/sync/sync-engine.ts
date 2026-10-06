@@ -70,6 +70,7 @@ export class SyncEngine {
   private timers: Timer[] = [];
   private foreground = true;
   private running = false;
+  private listeners = new Set<() => void>();
 
   constructor(
     private readonly client: OpenRouterClient,
@@ -77,6 +78,18 @@ export class SyncEngine {
     private readonly db: SqlDb,
     private readonly cb: SyncCallbacks = {},
   ) {}
+
+  /** Subscribe to refresh cycles (UI re-reads its data from SQLite). */
+  subscribe(fn: () => void): () => void {
+    this.listeners.add(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
+  }
+
+  private emit(): void {
+    for (const l of this.listeners) l();
+  }
 
   private touch(source: SourceName, err?: string) {
     const prev = this.status[source];
@@ -86,6 +99,7 @@ export class SyncEngine {
       stalenessMs: err ? (prev?.lastOkAt ? Date.now() - prev.lastOkAt : Infinity) : 0,
     };
     this.cb.onStatus?.({ ...this.status });
+    this.emit();
   }
 
   // ---- refreshers ---------------------------------------------------------

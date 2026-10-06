@@ -1,7 +1,6 @@
 /**
- * OpenRator — app entry: M1 wiring (onboarding → key → client → DB →
- * first sync). Real screens arrive in M2; this proves the whole data path
- * end-to-end on a device.
+ * OpenRator — app entry: M2 shell wiring. Boot → onboarding (M1) or themed
+ * tab shell with the Home Pane; sync engine runs behind the scenes.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -13,6 +12,8 @@ import { migrate } from './src/store/daos';
 import { openDb, SqlDb } from './src/store/db';
 import { SyncEngine } from './src/sync/sync-engine';
 import OnboardingScreen from './src/ui/onboarding';
+import Shell from './src/ui/shell';
+import { ThemeProvider, useTheme } from './src/ui/theme';
 
 type Stage = 'booting' | 'onboarding' | 'ready' | 'fatal';
 
@@ -22,6 +23,15 @@ interface Ctx {
 }
 
 export default function App() {
+  return (
+    <ThemeProvider>
+      <Inner />
+    </ThemeProvider>
+  );
+}
+
+function Inner() {
+  const t = useTheme();
   const [ctx, setCtx] = useState<Ctx | null>(null);
   const [stage, setStage] = useState<Stage>('booting');
   const [engine, setEngine] = useState<SyncEngine | null>(null);
@@ -37,34 +47,34 @@ export default function App() {
         await migrate(db);
         if (cancel) return;
         setCtx({ creds, db });
-        setStage((await creds.hasKey()) ? 'ready' : 'onboarding');
+        const hasKey = await creds.hasKey();
+        if (hasKey) {
+          const key = await creds.getKey();
+          if (key) {
+            const eng = makeEngine(creds, db, key, setNote);
+            setEngine(eng);
+            eng.start(true);
+            void eng.refreshAll();
+            setStage('ready');
+            return;
+          }
+        }
+        setStage('onboarding');
       } catch (e) {
-        setNote(String(e));
+        setNote(e instanceof Error ? e.message : String(e));
         setStage('fatal');
       }
     })();
     return () => {
       cancel = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function bootWithKey(key: string) {
-    if (!ctx) return;
-    const client = new OpenRouterClient({ apiKey: key });
-    const eng = new SyncEngine(client, ctx.creds, ctx.db, {
-      onError: (src, e) => setNote(`${src}: ${e.message}`),
-    });
-    setEngine(eng);
-    void eng.refreshAll().then(() => {
-      eng.start(true);
-      setStage('ready');
-    });
-  }
 
   if (stage === 'booting') {
     return (
-      <View style={styles.center}>
-        <Text>OpenRator — starting…</Text>
+      <View style={[styles.center, { backgroundColor: t.bg }]}>
+        <Text style={{ color: t.subtext }}>OpenRator — starting…</Text>
         <StatusBar style="auto" />
       </View>
     );
@@ -72,8 +82,8 @@ export default function App() {
 
   if (stage === 'fatal') {
     return (
-      <View style={styles.center}>
-        <Text style={styles.fatal}>Startup failed: {note}</Text>
+      <View style={[styles.center, { backgroundColor: t.bg }]}>
+        <Text style={{ color: t.danger }}>Startup failed: {note}</Text>
         <StatusBar style="auto" />
       </View>
     );
@@ -85,28 +95,37 @@ export default function App() {
         creds={ctx.creds}
         onDone={async () => {
           const key = await ctx.creds.getKey();
-          if (key) void bootWithKey(key);
+          if (!key) return;
+          const eng = makeEngine(ctx.creds, ctx.db, key, setNote);
+          setEngine(eng);
+          eng.start(true);
+          void eng.refreshAll();
+          setStage('ready');
         }}
         onError={(m) => setNote(m)}
       />
     );
   }
 
-  // ready — M1 summary card; replaced by real Home Pane in M2.
-  return (
-    <View style={styles.center}>
-      <Text style={styles.readyTitle}>OpenRator · M1 skeleton</Text>
-      <Text>Data layer wired. Home Pane arrives in M2.</Text>
-      {engine ? <Text>Sync engine running (credits poll active).</Text> : null}
-      {note ? <Text style={styles.note}>Note: {note}</Text> : null}
-      <StatusBar style="auto" />
-    </View>
-  );
+  if (stage === 'ready' && engine && ctx) {
+    return <Shell engine={engine} db={ctx.db} />;
+  }
+
+  return null;
+}
+
+function makeEngine(
+  creds: CredentialService,
+  db: SqlDb,
+  apiKey: string,
+  onError: (note: string) => void,
+): SyncEngine {
+  const client = new OpenRouterClient({ apiKey });
+  return new SyncEngine(client, creds, db, {
+    onError: (src, e) => onError(`${src}: ${e.message}`),
+  });
 }
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  fatal: { color: '#c00', fontSize: 14, textAlign: 'center' },
-  note: { color: '#a50', fontSize: 12, marginTop: 8 },
-  readyTitle: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
 });
