@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+    branches: ['main', 'm*', 'dev*']
+  pull_request:
+
+jobs:
+  mobile-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install
+        working-directory: apps/mobile
+        run: npm ci --no-audit --no-fund
+
+      - name: Unit tests
+        working-directory: apps/mobile
+        run: npx vitest run
+
+      - name: Typecheck
+        working-directory: apps/mobile
+        run: npx tsc --noEmit
+
+      - name: Android bundle (expo export)
+        working-directory: apps/mobile
+        run: npx expo export --platform android --output-dir dist-ci
+
+      - name: Upload Android bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-bundle
+          path: apps/mobile/dist-ci
+          retention-days: 7

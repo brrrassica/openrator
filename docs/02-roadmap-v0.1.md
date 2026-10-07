@@ -2,7 +2,7 @@
 
 **Owner:** PT Alat Cerdas · **App:** OpenRator (Expo/React Native)
 **Basis:** spec `01-specification.md` · Estimates assume 1 dev + AI coding
-assistance (deepseek-v4-flash-0731 via opencode) on `opencode-sam`.
+assistance (deepseek-v4-flash-0731 via opencode) on a local Linux workstation.
 Sizing: S ≤ 0.5 d · M ≤ 1 d · L ≤ 2 d (dev-days, inclusive of testing).
 
 > Gate rule: each milestone exits on its **exit criteria**; nothing is "done"
