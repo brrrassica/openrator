@@ -28,7 +28,7 @@ import { addDays } from '../sync/rollups';
 import { ActivityRow, KeyRow, Provider } from '../core/types';
 import { computeSpendSummary } from './spend-summary';
 import { fmtCount, fmtUsd } from './chart-math';
-import { AreaChart, BarRows, Donut } from './primitives';
+import { BarRows, Donut, ResponsiveAreaChart } from './primitives';
 import { useTheme } from './theme';
 
 interface Props {
@@ -46,6 +46,7 @@ export default function SpendPane({ engine, db }: Props) {
   const [period, setPeriod] = useState(30);
   const [rankBy, setRankBy] = useState<'spend' | 'requests'>('spend');
   const [refreshing, setRefreshing] = useState(false);
+  const [donutSize, setDonutSize] = useState(120);
   const mounted = useRef(true);
 
   const load = useCallback(async () => {
@@ -139,9 +140,8 @@ export default function SpendPane({ engine, db }: Props) {
               <Total label="requests" value={fmtCount(summary.totalRequests)} />
               <Total label="tokens" value={fmtCount(summary.totalTokens)} />
             </View>
-            <AreaChart
+            <ResponsiveAreaChart
               data={summary.trend.map((s) => s.spendUsd)}
-              width={320}
               height={110}
               color={t.accent}
             />
@@ -153,10 +153,18 @@ export default function SpendPane({ engine, db }: Props) {
             {summary.share.length === 0 ? (
               <Text style={{ color: t.subtext, fontSize: 13 }}>No provider spend in this window.</Text>
             ) : (
-              <View style={styles.donutRow}>
+              <View
+                style={styles.donutRow}
+                onLayout={(e) => {
+                  // WS2-5: size the donut to the available row width.
+                  const w = e.nativeEvent.layout.width;
+                  const s = Math.max(90, Math.min(140, Math.round(w * 0.38)));
+                  if (s !== donutSize) setDonutSize(s);
+                }}
+              >
                 <Donut
                   slices={summary.share.map((s, i) => ({ value: s.spendUsd, color: t.chart[i % t.chart.length] }))}
-                  size={120}
+                  size={donutSize}
                   strokeWidth={16}
                   center={fmtUsd(summary.totalSpend)}
                 />

@@ -7,7 +7,7 @@ glance, spend & endpoint analytics, upstream provider policy controls, and API
 key oversight — built with Expo / React Native, BYOK on-device (no backend in
 v0.1).
 
-*The name: OpenRouter + curator.*
+*The name: OpenRouter + Operator.* (I know it sucks)
 
 ## Status
 
@@ -52,14 +52,3 @@ npm start         # Expo dev server
 Commits auto-push to the self-hosted mirror via the versioned hook
 (`.githooks/`, enabled with `core.hooksPath`; it targets the `gitea` remote only).
 GitHub is pushed explicitly with `git push github main`.
-
-## Confirmed decisions (2026-10-05)
-
-| D | Decision |
-|---|---|
-| D1 | Expo / React Native (true Android app from React/TS) |
-| D2 | BYOK on-device, no backend in v0.1 |
-| D3 | Provider controls = Presets-based policy editor + read-only reflection + deep-link to dashboard privacy settings |
-| D4 | Personal tool first; productize after v0.2 validation |
-| D5 | Branding: **OpenRator** |
-| D7 | Usage feature = Spend & Endpoint analytics via `/activity` (mgmt key) — public API exposes no per-request generation list |

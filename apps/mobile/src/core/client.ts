@@ -324,17 +324,23 @@ export class OpenRouterClient {
     );
   }
 
-  /** POST /keys — body uses the documented snake_case wire fields. */
+  /**
+   * POST /keys — body uses the documented snake_case wire fields. The key's
+   * display name is the `label` field (spec §5.2 / spike §4.4), matching the
+   * PATCH contract and the `AdminKey` type (WS2-1).
+   */
   createAdminKey(body: {
-    name?: string;
+    label?: string;
     limit?: number;
     limitReset?: string;
+    includeByokInLimit?: boolean;
     expiresAt?: string;
   }): Promise<AdminKeyCreated> {
     const wire: Record<string, unknown> = {};
-    if (body.name !== undefined) wire.name = body.name;
+    if (body.label !== undefined) wire.label = body.label;
     if (body.limit !== undefined) wire.limit = body.limit;
     if (body.limitReset !== undefined) wire.limit_reset = body.limitReset;
+    if (body.includeByokInLimit !== undefined) wire.include_byok_in_limit = body.includeByokInLimit;
     if (body.expiresAt !== undefined) wire.expires_at = body.expiresAt;
     return this.singleFlight(() =>
       this.request<{ data: Record<string, unknown> }>('POST', '/keys', wire).then((r) =>
@@ -343,27 +349,39 @@ export class OpenRouterClient {
     );
   }
 
-  /** PATCH /keys/{id} — body uses the documented snake_case wire fields. */
+  /**
+   * PATCH /keys/{hash} — the path identifier is the key `hash` (spec §5.2),
+   * not an `id`. Body uses the documented snake_case wire fields (WS2-1).
+   */
   patchAdminKey(
-    id: string,
-    body: { label?: string; limit?: number; limitReset?: string; expiresAt?: string },
+    hash: string,
+    body: {
+      label?: string;
+      limit?: number;
+      limitReset?: string;
+      includeByokInLimit?: boolean;
+      expiresAt?: string;
+    },
   ): Promise<AdminKey> {
     const wire: Record<string, unknown> = {};
     if (body.label !== undefined) wire.label = body.label;
     if (body.limit !== undefined) wire.limit = body.limit;
     if (body.limitReset !== undefined) wire.limit_reset = body.limitReset;
+    if (body.includeByokInLimit !== undefined) wire.include_byok_in_limit = body.includeByokInLimit;
     if (body.expiresAt !== undefined) wire.expires_at = body.expiresAt;
     return this.singleFlight(() =>
-      this.request<{ data: Record<string, unknown> }>('PATCH', `/keys/${encodeURIComponent(id)}`, wire).then(
-        (r) => mapAs<AdminKey>(r.data),
-      ),
+      this.request<{ data: Record<string, unknown> }>(
+        'PATCH',
+        `/keys/${encodeURIComponent(hash)}`,
+        wire,
+      ).then((r) => mapAs<AdminKey>(r.data)),
     );
   }
 
-  /** DELETE /keys/{id} — destructive; callers double-confirm. */
-  async deleteAdminKey(id: string): Promise<void> {
+  /** DELETE /keys/{hash} — destructive; callers double-confirm. */
+  async deleteAdminKey(hash: string): Promise<void> {
     await this.singleFlight(() =>
-      this.request<unknown>('DELETE', `/keys/${encodeURIComponent(id)}`),
+      this.request<unknown>('DELETE', `/keys/${encodeURIComponent(hash)}`),
     );
   }
 }

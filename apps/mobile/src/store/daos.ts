@@ -50,16 +50,73 @@ CREATE TABLE IF NOT EXISTS provider_snapshot (
   regions TEXT NOT NULL DEFAULT '[]',
   status_page TEXT,
   last_ok_at TEXT,
+  state TEXT NOT NULL DEFAULT 'unknown',
   policy TEXT NOT NULL DEFAULT '{}'
 );
 `;
 
+/**
+ * Ordered migrations. Index `i` upgrades `user_version` from `i` to `i + 1`.
+ * Never reorder or delete an entry — append only (WS2-3).
+ */
+const MIGRATIONS: Array<(db: SqlDb) => Promise<void>> = [
+  // 1 — base schema (idempotent CREATE IF NOT EXISTS).
+  async (db) => {
+    await db.execAsync(SCHEMA_V1);
+  },
+  // 2 — usage_weekly for pre-existing DBs (idempotent column add).
+  async (db) => {
+    const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(keys)');
+    if (!cols.some((c) => c.name === 'usage_weekly')) {
+      await db.runAsync('ALTER TABLE keys ADD COLUMN usage_weekly REAL NOT NULL DEFAULT 0');
+    }
+  },
+  // 3 — provider health state (WS2-9).
+  async (db) => {
+    const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(provider_snapshot)');
+    if (!cols.some((c) => c.name === 'state')) {
+      await db.runAsync(
+        "ALTER TABLE provider_snapshot ADD COLUMN state TEXT NOT NULL DEFAULT 'unknown'",
+      );
+    }
+  },
+];
+
+/** Current schema version = number of migrations. */
+export const SCHEMA_VERSION = MIGRATIONS.length;
+
+/**
+ * Deterministic, versioned migration runner (WS2-3). Reads `PRAGMA
+ * user_version`, applies every pending migration in order, and bumps the
+ * version after each one so a crash mid-upgrade resumes cleanly.
+ */
 export async function migrate(db: SqlDb): Promise<void> {
-  await db.execAsync(SCHEMA_V1);
-  // idempotent column add for pre-existing DBs
-  const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(keys)');
-  if (!cols.some((c) => c.name === 'usage_weekly')) {
-    await db.runAsync('ALTER TABLE keys ADD COLUMN usage_weekly REAL NOT NULL DEFAULT 0');
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  let version = Number(row?.user_version ?? 0);
+  for (let i = version; i < MIGRATIONS.length; i++) {
+    await MIGRATIONS[i](db);
+    version = i + 1;
+    await db.execAsync(`PRAGMA user_version = ${version}`);
+  }
+}
+
+/**
+ * Runs `fn` inside a single SQLite transaction (WS2-2). Commits on success,
+ * rolls back on any throw so batched writes are all-or-nothing.
+ */
+export async function withTransaction<T>(db: SqlDb, fn: () => Promise<T>): Promise<T> {
+  await db.execAsync('BEGIN');
+  try {
+    const result = await fn();
+    await db.execAsync('COMMIT');
+    return result;
+  } catch (e) {
+    try {
+      await db.execAsync('ROLLBACK');
+    } catch {
+      // ignore rollback failure — surface the original error
+    }
+    throw e;
   }
 }
 
@@ -152,20 +209,27 @@ function rowToActivity(r: Record<string, unknown>): ActivityRow {
   };
 }
 
-/** Idempotent by (day, endpoint, api_key_hash) — re-sync replaces rows. */
+/**
+ * Idempotent by (day, endpoint, api_key_hash) — re-sync replaces rows.
+ * Batched in a single transaction so a mid-batch failure leaves the table
+ * untouched (WS2-2).
+ */
 export async function upsertActivityRows(db: SqlDb, rows: ActivityRow[]): Promise<void> {
-  for (const r of rows) {
-    await db.runAsync(
-      `INSERT OR REPLACE INTO endpoint_activity (${ACTIVITY_COLS})
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      r.day,
-      r.endpoint,
-      r.apiKeyHash,
-      r.requests,
-      r.spendUsd,
-      r.tokens,
-    );
-  }
+  if (rows.length === 0) return;
+  await withTransaction(db, async () => {
+    for (const r of rows) {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO endpoint_activity (${ACTIVITY_COLS})
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        r.day,
+        r.endpoint,
+        r.apiKeyHash,
+        r.requests,
+        r.spendUsd,
+        r.tokens,
+      );
+    }
+  });
 }
 
 export async function getActivityRows(
@@ -201,18 +265,22 @@ export async function pruneActivityOlderThan(db: SqlDb, dayExclusive: string): P
 
 // ---- daily rollups -------------------------------------------------------
 
+/** Replaces rollups atomically (WS2-2). */
 export async function replaceDailyRollups(db: SqlDb, rollups: DailyRollup[]): Promise<void> {
-  for (const r of rollups) {
-    await db.runAsync(
-      `INSERT OR REPLACE INTO daily_rollups (day, spend_usd, requests, tokens, by_endpoint)
-       VALUES (?, ?, ?, ?, ?)`,
-      r.day,
-      r.spendUsd,
-      r.requests,
-      r.tokens,
-      JSON.stringify(r.byEndpoint),
-    );
-  }
+  if (rollups.length === 0) return;
+  await withTransaction(db, async () => {
+    for (const r of rollups) {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO daily_rollups (day, spend_usd, requests, tokens, by_endpoint)
+         VALUES (?, ?, ?, ?, ?)`,
+        r.day,
+        r.spendUsd,
+        r.requests,
+        r.tokens,
+        JSON.stringify(r.byEndpoint),
+      );
+    }
+  });
 }
 
 export async function getDailyRollups(
@@ -246,21 +314,44 @@ export async function getDailyRollups(
 
 // ---- provider snapshot ---------------------------------------------------
 
-export async function upsertProviderRow(db: SqlDb, p: Provider): Promise<void> {
+/**
+ * Upserts one provider and stamps its health (WS2-9): a successful catalog
+ * sync marks the provider `ok` with `last_ok_at = now`.
+ */
+export async function upsertProviderRow(
+  db: SqlDb,
+  p: Provider,
+  nowIso: string = new Date().toISOString(),
+): Promise<void> {
   await db.runAsync(
-    `INSERT OR REPLACE INTO provider_snapshot (slug, name, regions, status_page, policy)
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO provider_snapshot
+       (slug, name, regions, status_page, last_ok_at, state, policy)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     p.slug,
     p.name,
     JSON.stringify(p.datacenters),
     p.statusPageUrl,
+    nowIso,
+    'ok',
     '{}',
   );
 }
 
+/** Batched provider upsert in one transaction (WS2-2). */
+export async function upsertProviderRows(
+  db: SqlDb,
+  providers: Provider[],
+  nowIso: string = new Date().toISOString(),
+): Promise<void> {
+  if (providers.length === 0) return;
+  await withTransaction(db, async () => {
+    for (const p of providers) await upsertProviderRow(db, p, nowIso);
+  });
+}
+
 export async function listProvidersFromDb(db: SqlDb): Promise<Provider[]> {
   const rows = await db.getAllAsync<Record<string, unknown>>(
-    'SELECT slug, name, regions, status_page FROM provider_snapshot ORDER BY name',
+    'SELECT slug, name, regions, status_page, last_ok_at, state FROM provider_snapshot ORDER BY name',
   );
   return rows.map((r) => ({
     slug: String(r.slug),
@@ -270,5 +361,7 @@ export async function listProvidersFromDb(db: SqlDb): Promise<Provider[]> {
     privacyPolicyUrl: null,
     termsOfServiceUrl: null,
     headquarters: null,
+    lastOkAt: (r.last_ok_at as string | null) ?? null,
+    state: (r.state as string | null) ?? null,
   }));
 }

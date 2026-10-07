@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { CredentialService, MemoryKeyValueStore } from '../src/core/credentials';
+import { CredentialService, KeyValueStore, MemoryKeyValueStore } from '../src/core/credentials';
+
+/** Store whose writes always fail — simulates a broken secure store (WS2-7). */
+class FailingStore implements KeyValueStore {
+  async get(): Promise<string | null> {
+    return null;
+  }
+  async set(): Promise<void> {
+    throw new Error('keystore unavailable');
+  }
+  async delete(): Promise<void> {
+    // no-op
+  }
+}
 
 describe('CredentialService — never logs, format-gated', () => {
   it('roundtrips key + mgmt flag through the store', async () => {
@@ -28,6 +41,15 @@ describe('CredentialService — never logs, format-gated', () => {
   it('isManagementKey defaults to false', async () => {
     const svc = new CredentialService(new MemoryKeyValueStore());
     expect(await svc.isManagementKey()).toBe(false);
+  });
+
+  it('saveKey rejects when the secure store write fails (WS2-7)', async () => {
+    const svc = new CredentialService(new FailingStore());
+    await expect(
+      svc.saveKey('sk-or-v1-abcdef-0123456789abcdefghij', false),
+    ).rejects.toThrow('keystore unavailable');
+    // the key must NOT be reported as saved
+    expect(await svc.hasKey()).toBe(false);
   });
 
   it('looksLikeKey gates the documented format', () => {

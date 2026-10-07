@@ -50,12 +50,10 @@ export async function createSecureKeyValueStore(): Promise<KeyValueStore> {
       }
     },
     async set(key: string, value: string) {
-      if (!impl) return;
-      try {
-        await impl.setItemAsync(key, value);
-      } catch {
-        // Keep the app usable; the key just won't survive restart.
-      }
+      // WS2-7: never silently swallow a write failure — the caller must be
+      // able to tell the user the key was NOT saved.
+      if (!impl) throw new Error('Secure storage is unavailable on this device');
+      await impl.setItemAsync(key, value);
     },
     async delete(key: string) {
       if (!impl) return;

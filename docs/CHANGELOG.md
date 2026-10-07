@@ -1,5 +1,31 @@
 # Changelog
 
+## [Unreleased] — WS2 (P1 robustness & UX)
+
+### Fixed
+- **WS2-1** Admin-key wire contract aligned to the documented API: PATCH/DELETE use
+  `/keys/{hash}` (not `{id}`) and create uses the `label` field (not `name`); added
+  `include_byok_in_limit` to create/patch bodies. `AdminKey.id` is now optional.
+- **WS2-7** Secure-store write failures are surfaced: `set()` throws instead of
+  silently swallowing, so onboarding reports the error and does not advance.
+
+### Changed
+- **WS2-2** Batched DB writes (`upsertActivityRows`, `replaceDailyRollups`, provider
+  upsert) now run inside a single transaction — all-or-nothing on mid-batch failure.
+- **WS2-3** Versioned migrations via `PRAGMA user_version` with an ordered migration
+  list (base schema → `usage_weekly` → provider `state`); deterministic upgrades.
+- **WS2-4** Onboarding screen themed with `useTheme()` tokens (dark-mode correct).
+- **WS2-5** Charts are responsive: `ResponsiveAreaChart` measures its container and
+  the provider-share donut sizes to the available row width.
+- **WS2-6** Added a themed error boundary with a recoverable "Reload" action.
+- **WS2-8** Preset routing writes are double-confirmed via `Alert.alert` (spec §10).
+- **WS2-9** Provider health is persisted (`last_ok_at` + `state`) and rendered as a
+  health dot on the Home strip, alongside the status-page link.
+
+### Developer
+- 100 unit/integration tests (added atomicity, v1→latest migration, provider-health,
+  admin-key contract, and secure-store-failure cases).
+
 ## [0.1.0] — 2026-10-06 — v0.1 feature-complete
 Android app (Expo/React Native SDK 57, Expo Go) — single-pane OpenRouter dashboard.
 

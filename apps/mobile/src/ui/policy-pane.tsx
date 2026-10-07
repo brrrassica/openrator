@@ -8,6 +8,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Linking,
   Pressable,
   RefreshControl,
@@ -109,46 +110,66 @@ export default function PolicyPane({ engine, db }: Props) {
 
   const config: PresetConfig | null = selected?.designatedVersion?.config ?? null;
 
+  /**
+   * WS2-8: every preset write is double-confirmed (spec §10) — a single
+   * accidental tap must never mutate routing policy.
+   */
   const onToggle = useCallback(
-    async (slug: string) => {
+    (slug: string) => {
       if (!selected || !config || busy) return;
       const curRule = ruleFor(config.provider, slug);
       const want = nextRule(curRule);
       const nextRouting = setRule(config.provider, slug, want);
-
-      // optimistic
-      const optim: Preset = { ...selected };
-      if (optim.designatedVersion) {
-        optim.designatedVersion = {
-          ...optim.designatedVersion,
-          config: withRouting(config, nextRouting),
-        };
-      }
-      setSelected(optim);
-      setError(null);
-      setNotice(null);
-      setBusy(true);
-      try {
-        const saved = await engine.client.upsertPreset(selected.slug, withRouting(config, nextRouting));
-        if (!mounted.current) return;
-        setSelected(saved);
-        const v = versionOf(saved);
-        const prevV = versionOf(selected);
-        setNotice(
-          prevV !== null && v !== null && v > prevV + 1
-            ? `Saved as version ${v} (a newer version already existed — this write won).`
-            : v !== null
-              ? `Saved — version ${v}`
-              : 'Saved.',
-        );
-        void loadPresets();
-      } catch (e) {
-        if (!mounted.current) return;
-        setSelected({ ...selected }); // rollback to last server truth
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setBusy(false);
-      }
+      Alert.alert(
+        'Confirm policy change',
+        `Set "${slug}" to "${want}" in preset "${selected.slug}"? This writes a new preset version.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Confirm',
+            onPress: () => {
+              void (async () => {
+                // optimistic
+                const optim: Preset = { ...selected };
+                if (optim.designatedVersion) {
+                  optim.designatedVersion = {
+                    ...optim.designatedVersion,
+                    config: withRouting(config, nextRouting),
+                  };
+                }
+                setSelected(optim);
+                setError(null);
+                setNotice(null);
+                setBusy(true);
+                try {
+                  const saved = await engine.client.upsertPreset(
+                    selected.slug,
+                    withRouting(config, nextRouting),
+                  );
+                  if (!mounted.current) return;
+                  setSelected(saved);
+                  const v = versionOf(saved);
+                  const prevV = versionOf(selected);
+                  setNotice(
+                    prevV !== null && v !== null && v > prevV + 1
+                      ? `Saved as version ${v} (a newer version already existed — this write won).`
+                      : v !== null
+                        ? `Saved — version ${v}`
+                        : 'Saved.',
+                  );
+                  void loadPresets();
+                } catch (e) {
+                  if (!mounted.current) return;
+                  setSelected({ ...selected }); // rollback to last server truth
+                  setError(e instanceof Error ? e.message : String(e));
+                } finally {
+                  setBusy(false);
+                }
+              })();
+            },
+          },
+        ],
+      );
     },
     [selected, config, busy, engine, loadPresets],
   );
