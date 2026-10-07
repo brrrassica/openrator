@@ -1,3 +1,6 @@
+# Self-hosted mirror of .github/workflows/ci.yml (same three checks).
+# Action majors stay on v4 here — the LAN act_runner image is validated on v4;
+# the GitHub copy runs v7+ (Node 24) as required by GitHub-hosted runners.
 name: ci
 
 on:
