@@ -329,7 +329,7 @@ export async function upsertProviderRow(
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     p.slug,
     p.name,
-    JSON.stringify(p.datacenters),
+    JSON.stringify(Array.isArray(p.datacenters) ? p.datacenters : []),
     p.statusPageUrl,
     nowIso,
     'ok',
@@ -349,6 +349,22 @@ export async function upsertProviderRows(
   });
 }
 
+/**
+ * Parses the stored `regions` JSON into a string array. The API may return
+ * `datacenters: null`, which round-trips through JSON as the string "null";
+ * normalize anything that isn't an array to `[]` so callers can safely use
+ * `.length`/`.slice` (WS2-9).
+ */
+function parseRegions(raw: unknown): string[] {
+  if (typeof raw !== 'string') return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function listProvidersFromDb(db: SqlDb): Promise<Provider[]> {
   const rows = await db.getAllAsync<Record<string, unknown>>(
     'SELECT slug, name, regions, status_page, last_ok_at, state FROM provider_snapshot ORDER BY name',
@@ -356,7 +372,7 @@ export async function listProvidersFromDb(db: SqlDb): Promise<Provider[]> {
   return rows.map((r) => ({
     slug: String(r.slug),
     name: String(r.name),
-    datacenters: JSON.parse(String(r.regions ?? '[]')) as string[],
+    datacenters: parseRegions(r.regions),
     statusPageUrl: r.status_page as string | null,
     privacyPolicyUrl: null,
     termsOfServiceUrl: null,
