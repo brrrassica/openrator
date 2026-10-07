@@ -13,6 +13,7 @@ import {
 } from './errors';
 import {
   ActivityPage,
+  ActivityRecord,
   AdminKey,
   AdminKeyCreated,
   Credits,
@@ -58,6 +59,15 @@ function pickList(raw: unknown): Record<string, unknown>[] {
   if (!raw || typeof raw !== 'object') return [];
   const data = (raw as { data?: unknown }).data;
   return Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+}
+
+/** True for DOM/RN AbortError raised when a request is aborted. */
+function isAbortError(e: unknown): boolean {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    (e as { name?: unknown }).name === 'AbortError'
+  );
 }
 
 /** Picks snake_case keys from `src` into a camelCase object. */
@@ -121,17 +131,29 @@ export class OpenRouterClient {
         const backoffMs = Math.min(500 * 2 ** (attempt - 1), 4000) + Math.floor(Math.random() * 150);
         await new Promise((r) => setTimeout(r, backoffMs));
       }
+      const controller = new AbortController();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      // Reject even if the underlying fetch ignores the abort signal.
+      const timeout = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new OpenRouterNetworkError('request timed out'));
+        }, this.timeoutMs);
+      });
       try {
-        const res = await this.fetchFn(url, {
-          method,
-          headers: {
-            Authorization: `Bearer ${this.opts.apiKey}`,
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: body === undefined ? undefined : JSON.stringify(body),
-          // RN fetch supports signal via AbortController; keep optional.
-        });
+        const res = await Promise.race([
+          this.fetchFn(url, {
+            method,
+            headers: {
+              Authorization: `Bearer ${this.opts.apiKey}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: body === undefined ? undefined : JSON.stringify(body),
+            signal: controller.signal,
+          }),
+          timeout,
+        ]);
         let json: unknown;
         try {
           json = await res.json();
@@ -146,7 +168,13 @@ export class OpenRouterClient {
         lastErr = err;
       } catch (e) {
         if (e instanceof OpenRouterApiError) throw e;
-        lastErr = e instanceof Error ? e : new Error(String(e));
+        if (isAbortError(e)) {
+          lastErr = new OpenRouterNetworkError('request aborted');
+        } else {
+          lastErr = e instanceof Error ? e : new Error(String(e));
+        }
+      } finally {
+        if (timer) clearTimeout(timer);
       }
     }
     throw lastErr ?? new OpenRouterNetworkError('request failed');
@@ -187,6 +215,27 @@ export class OpenRouterClient {
     );
   }
 
+  /**
+   * Follows links.next across every page (bounded) so the full 30-day window
+   * is captured. Mirrors listModelsUser's pagination contract.
+   */
+  async getActivityAll(opts?: { date?: string; apiKeyHash?: string }): Promise<ActivityPage> {
+    const MAX_PAGES = 50;
+    const MAX_ROWS = 10_000;
+    const data: ActivityRecord[] = [];
+    let cursor: string | undefined;
+    let totalCount: number | undefined;
+    let pages = 0;
+    do {
+      const page = await this.getActivity({ ...opts, cursor });
+      data.push(...page.data);
+      totalCount = page.totalCount ?? totalCount;
+      cursor = page.links?.next ?? undefined;
+      pages++;
+    } while (cursor && pages < MAX_PAGES && data.length < MAX_ROWS);
+    return { data, totalCount, links: { next: cursor ?? null } };
+  }
+
   listProviders(): Promise<Provider[]> {
     return this.singleFlight(() =>
       this.request<{ data: unknown[] }>('GET', '/providers').then((r) =>
@@ -200,21 +249,29 @@ export class OpenRouterClient {
     models: ModelRef[];
     next?: string | null;
   }> {
-    const path = opts?.cursor ?? '/models/user';
-    const page = await this.singleFlight(() =>
-      this.request<{ data: unknown[]; total_count?: number; links?: { next?: string | null } }>(
-        'GET',
-        path,
-      ).then((r) => ({
-        models: pickList(r).map((x) => mapAs<ModelRef>(x)),
-        next: r.links?.next,
-      })),
-    );
-    if (opts?.follow && page.next && !opts.cursor) {
-      const rest = await this.listModelsUser({ cursor: page.next, follow: true });
-      return { models: [...page.models, ...rest.models], next: rest.next };
-    }
-    return page;
+    const follow = opts?.follow !== false;
+    const MAX_PAGES = 50;
+    const models: ModelRef[] = [];
+    let cursor = opts?.cursor;
+    let next: string | null | undefined;
+    let pages = 0;
+    do {
+      const path = cursor ?? '/models/user';
+      const page = await this.singleFlight(() =>
+        this.request<{ data: unknown[]; total_count?: number; links?: { next?: string | null } }>(
+          'GET',
+          path,
+        ).then((r) => ({
+          models: pickList(r).map((x) => mapAs<ModelRef>(x)),
+          next: r.links?.next,
+        })),
+      );
+      models.push(...page.models);
+      next = page.next;
+      cursor = page.next ?? undefined;
+      pages++;
+    } while (follow && cursor && pages < MAX_PAGES);
+    return { models, next: next ?? null };
   }
 
   listPresets(): Promise<Preset[]> {

@@ -63,6 +63,20 @@ export async function migrate(db: SqlDb): Promise<void> {
   }
 }
 
+/**
+ * Wipe all cached usage data on sign-out (spec §6.2). Removes activity,
+ * rollups, provider snapshots, key rows, and non-credential settings so no
+ * usage data survives. Credential settings are cleared separately by the
+ * caller after the secure store is emptied.
+ */
+export async function clearAllData(db: SqlDb): Promise<void> {
+  await db.runAsync('DELETE FROM endpoint_activity');
+  await db.runAsync('DELETE FROM daily_rollups');
+  await db.runAsync('DELETE FROM provider_snapshot');
+  await db.runAsync('DELETE FROM keys');
+  await db.runAsync("DELETE FROM settings WHERE key NOT LIKE 'credential.%'");
+}
+
 // ---- settings ------------------------------------------------------------
 
 export async function getSetting(db: SqlDb, key: string): Promise<string | null> {

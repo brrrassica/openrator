@@ -150,7 +150,7 @@ export class SyncEngine {
       return null;
     }
     try {
-      const page = await this.client.getActivity();
+      const page = await this.client.getActivityAll();
       const rows = page.data.map(toActivityRow).filter((r) => r !== null) as ActivityRow[];
       if (rows.length) await upsertActivityRows(this.db, rows);
 
@@ -200,12 +200,18 @@ export class SyncEngine {
     }
   }
 
-  /** One full pass — used at onboarding and on manual refresh. */
+  /**
+   * One full pass — used at onboarding and on manual refresh. Failure-isolated:
+   * credits runs first, then the remaining sources run independently so one
+   * rejection never skips the rest. Per-source status is surfaced via touch().
+   */
   async refreshAll(): Promise<void> {
-    await this.refreshCredits();
-    await this.refreshActivity();
-    await this.refreshProviders();
-    await this.refreshModels();
+    await this.refreshCredits().catch(() => undefined);
+    await Promise.allSettled([
+      this.refreshActivity(),
+      this.refreshProviders(),
+      this.refreshModels(),
+    ]);
   }
 
   // ---- scheduler ----------------------------------------------------------
