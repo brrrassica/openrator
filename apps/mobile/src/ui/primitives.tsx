@@ -3,8 +3,8 @@
  * No heavy chart libs; math lives in chart-math.ts (pure).
  */
 
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { arcPath, areaPath, donutSegments, linePath } from './chart-math';
 import { useTheme } from './theme';
@@ -36,6 +36,35 @@ export function AreaChart({
         strokeLinecap="round"
       />
     </Svg>
+  );
+}
+
+/**
+ * Area chart that measures its container and fills the available width
+ * (WS2-5) — no more hardcoded 320px that overflows narrow devices.
+ */
+export function ResponsiveAreaChart({
+  data,
+  height,
+  color,
+}: {
+  data: number[];
+  height: number;
+  color?: string;
+}) {
+  const [width, setWidth] = useState(0);
+  const onLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0 && Math.abs(w - width) > 0.5) setWidth(w);
+  };
+  return (
+    <View onLayout={onLayout} style={styles.chartWrap}>
+      {width > 0 ? (
+        <AreaChart data={data} width={width} height={height} color={color} />
+      ) : (
+        <View style={{ height }} />
+      )}
+    </View>
   );
 }
 
@@ -120,6 +149,7 @@ export function Donut({
 }
 
 const styles = StyleSheet.create({
+  chartWrap: { width: '100%' },
   track: { width: '100%', height: 6, borderRadius: 3, overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3 },
   barHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },

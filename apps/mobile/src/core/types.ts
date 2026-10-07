@@ -48,6 +48,10 @@ export interface Provider {
   statusPageUrl: string | null;
   headquarters: string | null;
   datacenters: string[];
+  /** Local health stamp (WS2-9) — set from the on-device snapshot, not the API. */
+  lastOkAt?: string | null;
+  /** Local health state (WS2-9): 'ok' after a successful catalog sync. */
+  state?: string | null;
 }
 
 /** GET /api/v1/models/user → data[] (filtered by user prefs; read-only). */
@@ -173,9 +177,13 @@ export interface KeyRow {
   updatedAt: string;
 }
 
-/** GET /api/v1/keys → data[] (mgmt-key only; 401 for standard keys). */
+/**
+ * GET /api/v1/keys → data[] (mgmt-key only; 401 for standard keys).
+ * The canonical identifier is `hash` — it is what PATCH/DELETE paths use
+ * (spec §5.2). `id` is kept optional for responses that also include it.
+ */
 export interface AdminKey {
-  id: string;
+  id?: string;
   hash: string;
   label: string;
   created: number;
@@ -195,7 +203,7 @@ export interface AdminKey {
 
 /** POST /api/v1/keys → data; `key` holds the one-time full secret. */
 export interface AdminKeyCreated extends Partial<AdminKey> {
-  id: string;
+  hash: string;
   /** Full key value — shown once, never persisted by OpenRator. */
   key: string;
 }

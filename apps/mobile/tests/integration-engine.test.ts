@@ -10,6 +10,8 @@ import {
   listProvidersFromDb,
   migrate,
   pruneActivityOlderThan,
+  SCHEMA_VERSION,
+  upsertActivityRows,
 } from '../src/store/daos';
 import { SyncEngine } from '../src/sync/sync-engine';
 import { CredentialService, MemoryKeyValueStore } from '../src/core/credentials';
@@ -48,6 +50,29 @@ class NodeSqlite implements SqlDb {
   }
   async closeAsync(): Promise<void> {
     this.db.close();
+  }
+}
+
+/** Wraps a SqlDb and fails the Nth runAsync — for atomicity tests (WS2-2). */
+class FlakyDb implements SqlDb {
+  private n = 0;
+  constructor(private readonly inner: SqlDb, private readonly failOn: number) {}
+  execAsync(sql: string): Promise<void> {
+    return this.inner.execAsync(sql);
+  }
+  runAsync(sql: string, ...params: (string | number | null)[]) {
+    this.n++;
+    if (this.n === this.failOn) return Promise.reject(new Error('disk full'));
+    return this.inner.runAsync(sql, ...params);
+  }
+  getAllAsync<T>(sql: string, ...params: (string | number | null)[]): Promise<T[]> {
+    return this.inner.getAllAsync<T>(sql, ...params);
+  }
+  getFirstAsync<T>(sql: string, ...params: (string | number | null)[]): Promise<T | null> {
+    return this.inner.getFirstAsync<T>(sql, ...params);
+  }
+  closeAsync(): Promise<void> {
+    return this.inner.closeAsync();
   }
 }
 
@@ -260,6 +285,72 @@ describe('engine E2E over real SQLite (M5.4)', () => {
     expect(await getActivityRows(db)).toHaveLength(3);
     expect(await listProvidersFromDb(db)).toHaveLength(2);
     expect(await getSetting(db, 'models_user_count')).toBe('1');
+  });
+
+  it('upsertActivityRows is atomic: a mid-batch failure rolls back (WS2-2)', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    const flaky = new FlakyDb(db, 2);
+    const rows: ActivityRow[] = [
+      { day: '2026-10-04', endpoint: 'a', apiKeyHash: 'h1', requests: 1, spendUsd: 0.1, tokens: 10 },
+      { day: '2026-10-04', endpoint: 'b', apiKeyHash: 'h1', requests: 2, spendUsd: 0.2, tokens: 20 },
+      { day: '2026-10-04', endpoint: 'c', apiKeyHash: 'h1', requests: 3, spendUsd: 0.3, tokens: 30 },
+    ];
+    await expect(upsertActivityRows(flaky, rows)).rejects.toThrow('disk full');
+    // the first insert was rolled back with the rest
+    expect(await getActivityRows(db)).toHaveLength(0);
+  });
+
+  it('migrate upgrades a v1 database to the latest schema (WS2-3)', async () => {
+    const db = new NodeSqlite();
+    // Simulate a v1 DB: full base schema, but keys lacks usage_weekly and
+    // provider_snapshot lacks state; user_version = 1.
+    await db.execAsync(
+      `CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+       CREATE TABLE keys (
+         hash TEXT PRIMARY KEY, label TEXT NOT NULL,
+         is_management INTEGER NOT NULL DEFAULT 0,
+         "limit" REAL NOT NULL DEFAULT 0,
+         limit_remaining REAL NOT NULL DEFAULT 0,
+         limit_reset TEXT,
+         usage_monthly REAL NOT NULL DEFAULT 0,
+         usage_daily REAL NOT NULL DEFAULT 0,
+         expires_at TEXT, updated_at TEXT NOT NULL
+       );
+       CREATE TABLE endpoint_activity (
+         day TEXT NOT NULL, endpoint TEXT NOT NULL,
+         api_key_hash TEXT NOT NULL DEFAULT '', requests INTEGER NOT NULL DEFAULT 0,
+         spend_usd REAL NOT NULL DEFAULT 0, tokens INTEGER NOT NULL DEFAULT 0,
+         PRIMARY KEY (day, endpoint, api_key_hash)
+       );
+       CREATE TABLE daily_rollups (
+         day TEXT PRIMARY KEY, spend_usd REAL NOT NULL DEFAULT 0,
+         requests INTEGER NOT NULL DEFAULT 0, tokens INTEGER NOT NULL DEFAULT 0,
+         by_endpoint TEXT NOT NULL DEFAULT '{}'
+       );
+       CREATE TABLE provider_snapshot (
+         slug TEXT PRIMARY KEY, name TEXT NOT NULL,
+         regions TEXT NOT NULL DEFAULT '[]', status_page TEXT,
+         last_ok_at TEXT, policy TEXT NOT NULL DEFAULT '{}'
+       );`,
+    );
+    await db.execAsync('PRAGMA user_version = 1');
+    await migrate(db);
+    const keyCols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(keys)');
+    expect(keyCols.some((c) => c.name === 'usage_weekly')).toBe(true);
+    const provCols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(provider_snapshot)');
+    expect(provCols.some((c) => c.name === 'state')).toBe(true);
+    const v = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+    expect(Number(v?.user_version)).toBe(SCHEMA_VERSION);
+  });
+
+  it('refreshProviders stamps provider health state (WS2-9)', async () => {
+    const { db, engine } = await makeEngine();
+    await engine.refreshProviders();
+    const providers = await listProvidersFromDb(db);
+    expect(providers).toHaveLength(2);
+    expect(providers.every((p) => p.state === 'ok')).toBe(true);
+    expect(providers.every((p) => typeof p.lastOkAt === 'string')).toBe(true);
   });
 
   it('clearAllData wipes cached usage data on sign-out', async () => {

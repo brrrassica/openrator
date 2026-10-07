@@ -16,7 +16,7 @@ import {
   setSetting,
   upsertActivityRows,
   upsertKeyRow,
-  upsertProviderRow,
+  upsertProviderRows,
 } from '../store/daos';
 import { ActivityRow, KeyStatus, Provider } from '../core/types';
 
@@ -176,7 +176,8 @@ export class SyncEngine {
   async refreshProviders(): Promise<Provider[]> {
     try {
       const providers = await this.client.listProviders();
-      for (const p of providers) await upsertProviderRow(this.db, p);
+      // Batched in one transaction (WS2-2); stamps last_ok_at/state (WS2-9).
+      await upsertProviderRows(this.db, providers);
       this.touch('providers');
       this.cb.onProviders?.(providers);
       return providers;

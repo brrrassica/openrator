@@ -141,10 +141,10 @@ export default function KeysPane({ engine, db, onSignOut }: Props) {
           ) : null}
 
           {adminKeys.map((ak) => (
-            <View key={ak.id} style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+            <View key={ak.hash} style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
               <Pressable
                 style={styles.keyRow}
-                onPress={() => setEditingId(editingId === ak.id ? null : ak.id)}
+                onPress={() => setEditingId(editingId === ak.hash ? null : ak.hash)}
                 accessibilityRole="button"
               >
                 <View style={{ flex: 1, paddingRight: 8 }}>
@@ -153,16 +153,16 @@ export default function KeysPane({ engine, db, onSignOut }: Props) {
                     {ak.isManagementKey ? ' · mgmt' : ''}
                   </Text>
                   <Text style={{ color: t.subtext, fontSize: 10 }}>
-                    {ak.id.slice(0, 8)} · {fmtUsd(ak.usageMonthly)}/mo
+                    {ak.hash.slice(0, 8)} · {fmtUsd(ak.usageMonthly)}/mo
                     {ak.limit > 0 ? ` · limit ${fmtUsd(ak.limit)} (${fmtUsd(ak.limitRemaining)} left)` : ''}
                     {ak.limitReset ? ` · ${ak.limitReset}` : ''}
                   </Text>
                 </View>
                 <Text style={{ color: t.subtext, fontSize: 11 }}>
-                  {editingId === ak.id ? '▴' : '▾'}
+                  {editingId === ak.hash ? '▴' : '▾'}
                 </Text>
               </Pressable>
-              {editingId === ak.id ? (
+              {editingId === ak.hash ? (
                 <KeyEditor
                   theme={t}
                   adminKey={ak}
@@ -249,7 +249,7 @@ function KeyEditor({
     setSaving(true);
     setErr(null);
     try {
-      await client.patchAdminKey(adminKey.id, {
+      await client.patchAdminKey(adminKey.hash, {
         label: label.trim() || undefined,
         limit: limit.trim() ? Number(limit) : undefined,
         limitReset: reset || undefined,
@@ -273,7 +273,7 @@ function KeyEditor({
           style: 'destructive',
           onPress: () => {
             client
-              .deleteAdminKey(adminKey.id)
+              .deleteAdminKey(adminKey.hash)
               .then(onDone)
               .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
           },
@@ -359,7 +359,7 @@ function CreateKeyForm({
     setTestResult(null);
     try {
       const created = await client.createAdminKey({
-        name: label.trim() || undefined,
+        label: label.trim() || undefined,
         limit: limit.trim() ? Number(limit) : undefined,
       });
       dispatch({ type: 'reveal', keyValue: created.key });

@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CredentialService, createSecureKeyValueStore } from './src/core/credentials';
 import { OpenRouterClient } from './src/core/client';
 import { clearAllData, migrate, setSetting } from './src/store/daos';
@@ -25,8 +25,59 @@ interface Ctx {
 export default function App() {
   return (
     <ThemeProvider>
-      <Inner />
+      <ErrorBoundary>
+        <Inner />
+      </ErrorBoundary>
     </ThemeProvider>
+  );
+}
+
+/**
+ * WS2-6: catches render-time throws anywhere in the tree and shows a themed,
+ * recoverable fallback instead of a white screen. No error payload is logged.
+ */
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error): { error: Error } {
+    return { error };
+  }
+
+  componentDidCatch(): void {
+    // Intentionally no payload logging (spec §10).
+  }
+
+  private reset = (): void => this.setState({ error: null });
+
+  render(): React.ReactNode {
+    if (this.state.error) {
+      return <ErrorFallback error={this.state.error} onReload={this.reset} />;
+    }
+    return this.props.children;
+  }
+}
+
+function ErrorFallback({ error, onReload }: { error: Error; onReload: () => void }) {
+  const t = useTheme();
+  return (
+    <View style={[styles.center, { backgroundColor: t.bg }]}>
+      <Text style={{ color: t.danger, fontSize: 16, fontWeight: '700', marginBottom: 8 }}>
+        Something went wrong
+      </Text>
+      <Text style={{ color: t.subtext, fontSize: 13, textAlign: 'center', marginBottom: 16 }}>
+        {error.message}
+      </Text>
+      <Pressable
+        onPress={onReload}
+        style={{ borderWidth: 1, borderColor: t.accent, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 }}
+        accessibilityRole="button"
+      >
+        <Text style={{ color: t.accent, fontWeight: '700' }}>Reload</Text>
+      </Pressable>
+    </View>
   );
 }
 

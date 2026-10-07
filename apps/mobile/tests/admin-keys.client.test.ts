@@ -65,39 +65,53 @@ describe('management-key plane (client)', () => {
     expect(calls()).toHaveLength(1);
   });
 
-  it('creates a key with snake_case wire body and returns the onetime secret', async () => {
+  it('creates a key with the documented `label` wire field and returns the onetime secret', async () => {
     const { client, calls } = makeAdminClient(async (_input, init) => {
       const sent = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-      expect(sent.name).toBe('t');
+      expect(sent.label).toBe('t');
+      expect(sent.name).toBeUndefined();
       expect(sent.limit).toBe(5);
       expect(sent.limit_reset).toBeUndefined();
-      return res(200, { data: { id: 'k2', key: 'sk-or-v1-created-secret', label: 't', limit: 5 } });
+      return res(200, {
+        data: { hash: 'sk-or-v1-new', key: 'sk-or-v1-created-secret', label: 't', limit: 5 },
+      });
     });
-    const created = await client.createAdminKey({ name: 't', limit: 5 });
+    const created = await client.createAdminKey({ label: 't', limit: 5 });
     expect(created.key).toBe('sk-or-v1-created-secret');
     expect(calls()).toHaveLength(1);
   });
 
-  it('patches label/limit with snake_case body', async () => {
+  it('patches label/limit by hash with snake_case body', async () => {
     const { client } = makeAdminClient(async (input, init) => {
-      expect(input).toContain('/keys/k1');
+      expect(input).toContain('/keys/sk-or-v1-abc123');
       const sent = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
       expect(sent.label).toBe('renamed');
       expect(sent.limit).toBe(20);
-      return res(200, { data: { id: 'k1', label: 'renamed', limit: 20 } });
+      return res(200, { data: { hash: 'sk-or-v1-abc123', label: 'renamed', limit: 20 } });
     });
-    const updated = await client.patchAdminKey('k1', { label: 'renamed', limit: 20 });
+    const updated = await client.patchAdminKey('sk-or-v1-abc123', { label: 'renamed', limit: 20 });
     expect(updated.label).toBe('renamed');
   });
 
-  it('deletes a key with DELETE verb', async () => {
+  it('deletes a key by hash with DELETE verb', async () => {
     const { client, calls } = makeAdminClient(async (input, init) => {
-      expect(input).toContain('/keys/k1');
+      expect(input).toContain('/keys/sk-or-v1-abc123');
       expect(init?.method).toBe('DELETE');
       return res(200, {});
     });
-    await client.deleteAdminKey('k1');
+    await client.deleteAdminKey('sk-or-v1-abc123');
     expect(calls()).toHaveLength(1);
+  });
+
+  it('contract: recorded /keys fixture maps to the AdminKey shape (WS2-1)', async () => {
+    const { client } = makeAdminClient(async () => res(200, ADMIN_KEYS));
+    const keys = await client.listAdminKeys();
+    const k = keys[0];
+    expect(k.hash).toBe('sk-or-v1-abc123');
+    expect(k.label).toBe('prod');
+    expect(k.limitReset).toBe('monthly');
+    expect(k.includeByokInLimit).toBe(false);
+    expect(k.expiresAt).toBe('2027-01-01T00:00:00Z');
   });
 
   it('testRawKey proves a created key works via /key', async () => {

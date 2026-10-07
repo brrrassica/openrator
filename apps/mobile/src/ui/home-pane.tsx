@@ -26,7 +26,7 @@ import { POLL } from '../core/config';
 import { DailyRollup, KeyRow, Provider } from '../core/types';
 import { computeHomeSummary, HomeSummary, resetLabel } from './home-summary';
 import { fmtCount, fmtUsd, limitLabel } from './chart-math';
-import { AreaChart, BarRows } from './primitives';
+import { BarRows, ResponsiveAreaChart } from './primitives';
 import { useTheme } from './theme';
 
 interface Props {
@@ -175,7 +175,7 @@ export default function HomePane({ engine, db }: Props) {
         <Text style={{ color: t.subtext, fontSize: 12, marginBottom: 8 }}>
           {fmtUsd(summary.spend7d)} in the last 7 days
         </Text>
-        <AreaChart data={summary.trend} width={320} height={110} color={t.accent} />
+        <ResponsiveAreaChart data={summary.trend} height={110} color={t.accent} />
       </View>
 
       {/* Top endpoints */}
@@ -199,22 +199,33 @@ export default function HomePane({ engine, db }: Props) {
         <Text style={[styles.cardTitle, { color: t.text }]}>
           Upstream providers — {summary.providers.length} catalogued
         </Text>
-        {summary.providers.slice(0, 8).map((p) => (
-          <Pressable
-            key={p.slug}
-            style={styles.healthRow}
-            onPress={() => p.statusPageUrl && void Linking.openURL(p.statusPageUrl)}
-          >
-            <Text style={{ color: t.text, flex: 1 }} numberOfLines={1}>
-              {p.name}
-            </Text>
-            {p.statusPageUrl ? (
-              <Text style={{ color: t.accent, fontSize: 11 }}>status page ↗</Text>
-            ) : (
-              <Text style={{ color: t.subtext, fontSize: 11 }}>no status page</Text>
-            )}
-          </Pressable>
-        ))}
+        {summary.providers.slice(0, 8).map((p) => {
+          // WS2-9: health dot from the persisted snapshot state/last_ok_at.
+          const ageMs = p.lastOkAt ? Date.now() - new Date(p.lastOkAt).getTime() : Infinity;
+          const dotColor =
+            p.state !== 'ok' || !p.lastOkAt
+              ? t.subtext
+              : ageMs > 2 * 86_400_000
+                ? t.warn
+                : t.ok;
+          return (
+            <Pressable
+              key={p.slug}
+              style={styles.healthRow}
+              onPress={() => p.statusPageUrl && void Linking.openURL(p.statusPageUrl)}
+            >
+              <View style={[styles.healthDot, { backgroundColor: dotColor }]} />
+              <Text style={{ color: t.text, flex: 1 }} numberOfLines={1}>
+                {p.name}
+              </Text>
+              {p.statusPageUrl ? (
+                <Text style={{ color: t.accent, fontSize: 11 }}>status page ↗</Text>
+              ) : (
+                <Text style={{ color: t.subtext, fontSize: 11 }}>no status page</Text>
+              )}
+            </Pressable>
+          );
+        })}
       </View>
     </ScrollView>
   );
@@ -260,4 +271,5 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#8888',
   },
+  healthDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
 });
