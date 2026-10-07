@@ -67,7 +67,9 @@ export default function CatalogPane({ engine, db }: Props) {
   const filtered = providers
     .filter((p) => !q || p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q))
     .sort((a, b) =>
-      sort === 'regions' ? b.datacenters.length - a.datacenters.length : a.name.localeCompare(b.name),
+      sort === 'regions'
+        ? (b.datacenters?.length ?? 0) - (a.datacenters?.length ?? 0)
+        : a.name.localeCompare(b.name),
     );
 
   const stale = isStale(engine.getStatus().providers?.lastOkAt, POLL.SNAPSHOT_DAILY_MS);
@@ -117,33 +119,36 @@ export default function CatalogPane({ engine, db }: Props) {
         </View>
       </View>
 
-      {filtered.map((p) => (
-        <View key={p.slug} style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-          <View style={styles.rowHeader}>
-            <Text style={{ color: t.text, fontSize: 14, fontWeight: '700', flex: 1 }}>{p.name}</Text>
-            {p.statusPageUrl ? (
-              <Pressable onPress={() => void Linking.openURL(p.statusPageUrl as string)}>
-                <Text style={{ color: t.accent, fontSize: 11 }}>status ↗</Text>
-              </Pressable>
-            ) : null}
-          </View>
-          <Text style={{ color: t.subtext, fontSize: 11 }}>{p.slug}</Text>
-          {p.datacenters.length ? (
-            <View style={styles.chips}>
-              {p.datacenters.slice(0, 3).map((d) => (
-                <View key={d} style={[styles.chip, { backgroundColor: t.accent + '18' }]}>
-                  <Text style={{ color: t.accent, fontSize: 10 }}>{d}</Text>
-                </View>
-              ))}
-              {p.datacenters.length > 3 ? (
-                <Text style={{ color: t.subtext, fontSize: 10 }}>
-                  +{p.datacenters.length - 3} more
-                </Text>
+      {filtered.map((p) => {
+        const datacenters = p.datacenters ?? [];
+        return (
+          <View key={p.slug} style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+            <View style={styles.rowHeader}>
+              <Text style={{ color: t.text, fontSize: 14, fontWeight: '700', flex: 1 }}>{p.name}</Text>
+              {p.statusPageUrl ? (
+                <Pressable onPress={() => void Linking.openURL(p.statusPageUrl as string)}>
+                  <Text style={{ color: t.accent, fontSize: 11 }}>status ↗</Text>
+                </Pressable>
               ) : null}
             </View>
-          ) : null}
-        </View>
-      ))}
+            <Text style={{ color: t.subtext, fontSize: 11 }}>{p.slug}</Text>
+            {datacenters.length ? (
+              <View style={styles.chips}>
+                {datacenters.slice(0, 3).map((d) => (
+                  <View key={d} style={[styles.chip, { backgroundColor: t.accent + '18' }]}>
+                    <Text style={{ color: t.accent, fontSize: 10 }}>{d}</Text>
+                  </View>
+                ))}
+                {datacenters.length > 3 ? (
+                  <Text style={{ color: t.subtext, fontSize: 10 }}>
+                    +{datacenters.length - 3} more
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        );
+      })}
     </ScrollView>
   );
 }
