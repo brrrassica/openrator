@@ -18,6 +18,10 @@ export interface TopRow {
 }
 
 export interface HomeSummary {
+  /** OpenRouter account credits (GET /credits). */
+  creditsTotal: number;
+  creditsUsage: number;
+  creditsRemaining: number;
   label: string;
   limit: number;
   limitRemaining: number;
@@ -43,6 +47,9 @@ export interface HomeInputs {
   staleCredits: boolean;
   /** activity analytics locked because no management key */
   activityLocked: boolean;
+  /** OpenRouter account credits (GET /credits); undefined when never synced. */
+  creditsTotal?: number;
+  creditsUsage?: number;
 }
 
 const RESET_LABEL: Record<string, string> = {
@@ -53,6 +60,9 @@ const RESET_LABEL: Record<string, string> = {
 
 export function computeHomeSummary(inputs: HomeInputs): HomeSummary {
   const { key, rollups, providers, today, staleCredits } = inputs;
+  const creditsTotal = inputs.creditsTotal ?? 0;
+  const creditsUsage = inputs.creditsUsage ?? 0;
+  const creditsRemaining = creditsTotal - creditsUsage;
 
   const series = buildSpendSeries(today, 14, rollups);
   const trend = series.map((s) => s.spendUsd);
@@ -92,6 +102,9 @@ export function computeHomeSummary(inputs: HomeInputs): HomeSummary {
   }
 
   return {
+    creditsTotal,
+    creditsUsage,
+    creditsRemaining,
     label: key?.label ?? 'key',
     limit: key?.limit ?? 0,
     limitRemaining: key?.limitRemaining ?? 0,
@@ -111,4 +124,23 @@ export function computeHomeSummary(inputs: HomeInputs): HomeSummary {
 
 export function resetLabel(reset: string | null | undefined): string {
   return (reset && RESET_LABEL[reset]) || '';
+}
+
+/** A provider snapshot older than this is treated as a health problem. */
+export const PROVIDER_STALE_MS = 2 * 86_400_000;
+
+/**
+ * True when a provider is "showing problems" on the Home health strip.
+ * Providers without a status page are never surfaced here, and a provider is
+ * only flagged when its health snapshot is not ok, missing, or stale.
+ */
+export function providerHasProblem(p: Provider, now: number = Date.now()): boolean {
+  if (!p.statusPageUrl) return false;
+  if (p.state !== 'ok' || !p.lastOkAt) return true;
+  return now - new Date(p.lastOkAt).getTime() > PROVIDER_STALE_MS;
+}
+
+/** Providers with a status page that are currently showing problems. */
+export function problemProviders(providers: Provider[], now: number = Date.now()): Provider[] {
+  return providers.filter((p) => providerHasProblem(p, now));
 }

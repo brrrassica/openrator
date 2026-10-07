@@ -78,6 +78,7 @@ describe('formatters', () => {
     expect(fmtUsd(0.02)).toBe('$0.02');
     expect(fmtUsd(1.234)).toBe('$1.23');
     expect(fmtUsd(9.99)).toBe('$9.99');
+    expect(fmtUsd(12.3)).toBe('$12.30');
     expect(fmtUsd(1234)).toBe('$1.2k');
     expect(fmtUsd(2_500_000)).toBe('$2.5m');
     expect(fmtUsd(-3.5)).toBe('-$3.50');
@@ -91,7 +92,7 @@ describe('formatters', () => {
   });
 
   it('limitLabel: unlimited for zero/non-finite, else remaining/limit', () => {
-    expect(limitLabel(3.2, 4)).toBe('3.2 / 4.0');
+    expect(limitLabel(3.2, 4)).toBe('3.20 / 4.00');
     expect(limitLabel(2, 0)).toBe('unlimited');
     expect(limitLabel(Number.NaN, 0)).toBe('unlimited');
   });
