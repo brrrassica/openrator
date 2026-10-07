@@ -7,4 +7,3 @@ dist/
 core.[0-9]*
 dist-ci/
 plans/
-apps/mobile/*.json
