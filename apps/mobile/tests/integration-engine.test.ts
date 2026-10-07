@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import { SqlDb } from '../src/store/db';
 import {
+  clearAllData,
   getActivityRows,
   getDailyRollups,
   getKeyRow,
@@ -193,5 +194,89 @@ describe('engine E2E over real SQLite (M5.4)', () => {
     await pruneActivityOlderThan(db, '2021-01-01');
     const left = await getActivityRows(db);
     expect(left).toHaveLength(0);
+  });
+
+  it('refreshActivity persists every page of a paginated /activity response', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    const creds = new CredentialService(new MemoryKeyValueStore());
+    await creds.saveKey(FIXTURE_KEY, true);
+    const client = new OpenRouterClient({
+      apiKey: FIXTURE_KEY,
+      baseUrl: 'https://openrouter.ai/api/v1',
+      fetchFn: async (input: string) => {
+        if (input.includes('cursor=page2')) {
+          return res({
+            data: [
+              { date: '2026-10-05', endpoint: 'openai/gpt-4o-mini', api_key_hash: 'h1', requests: 5, spend_usd: 0.75, tokens: 2100 },
+            ],
+            total_count: 2,
+            links: { next: null },
+          });
+        }
+        return res({
+          data: [
+            { date: '2026-10-04', endpoint: 'openai/gpt-4o-mini', api_key_hash: 'h1', requests: 12, spend_usd: 1.0, tokens: 4000 },
+          ],
+          total_count: 2,
+          links: { next: 'page2' },
+        });
+      },
+    });
+    const engine = new SyncEngine(client, creds, db, {});
+    await engine.refreshActivity();
+    const rows = await getActivityRows(db);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.day).sort()).toEqual(['2026-10-04', '2026-10-05']);
+  });
+
+  it('refreshAll is failure-isolated: a credits failure still syncs other sources', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    const creds = new CredentialService(new MemoryKeyValueStore());
+    await creds.saveKey(FIXTURE_KEY, true);
+    const client = new OpenRouterClient({
+      apiKey: FIXTURE_KEY,
+      baseUrl: 'https://openrouter.ai/api/v1',
+      maxRetries: 0,
+      fetchFn: async (input: string) => {
+        if (input.includes('/key')) {
+          return {
+            status: 500,
+            headers: { get: () => null },
+            json: async () => ({ error: { message: 'boom' } }),
+          };
+        }
+        if (input.includes('/credits')) return res({ data: { total_credits: 1, total_usage: 0 } });
+        if (input.includes('/activity')) return res({ data: ACTIVITY, total_count: 3 });
+        if (input.includes('/providers')) return res({ data: PROVIDERS });
+        if (input.includes('/models/user'))
+          return res({ data: [{ id: 'openai/gpt-4o-mini' }], total_count: 1 });
+        return res({ data: [] });
+      },
+    });
+    const engine = new SyncEngine(client, creds, db, {});
+    await expect(engine.refreshAll()).resolves.toBeUndefined();
+    expect(await getActivityRows(db)).toHaveLength(3);
+    expect(await listProvidersFromDb(db)).toHaveLength(2);
+    expect(await getSetting(db, 'models_user_count')).toBe('1');
+  });
+
+  it('clearAllData wipes cached usage data on sign-out', async () => {
+    const { db, engine } = await makeEngine();
+    await engine.refreshAll();
+    expect((await getActivityRows(db)).length).toBeGreaterThan(0);
+    expect((await getDailyRollups(db)).length).toBeGreaterThan(0);
+    expect((await listProvidersFromDb(db)).length).toBeGreaterThan(0);
+
+    await clearAllData(db);
+
+    expect(await getActivityRows(db)).toHaveLength(0);
+    expect(await getDailyRollups(db)).toHaveLength(0);
+    expect(await listProvidersFromDb(db)).toHaveLength(0);
+    expect(await db.getAllAsync('SELECT hash FROM keys')).toHaveLength(0);
+    // non-credential settings gone; credential settings preserved for the caller
+    expect(await getSetting(db, 'account.total_credits')).toBeNull();
+    expect(await getSetting(db, 'credential.key_hash')).not.toBeNull();
   });
 });

@@ -7,8 +7,8 @@
     "production": {
       "channel": "production",
       "android": {
-        "buildType": "app-platform-project",
-        "distribution": "store"
+        "buildType": "apk",
+        "distribution": "internal"
       }
     }
   }

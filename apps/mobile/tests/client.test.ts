@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { OpenRouterClient } from '../src/core/client';
-import { OpenRouterApiError } from '../src/core/errors';
+import { OpenRouterApiError, OpenRouterNetworkError } from '../src/core/errors';
 
 interface FakeRes {
   status: number;
@@ -188,6 +188,61 @@ describe('OpenRouterClient', () => {
     const credits = await client.getCredits();
     expect(credits.totalCredits).toBe(2);
     expect(calls()).toHaveLength(2);
+  });
+
+  it('aborts a hung request after timeoutMs and drains the single-flight queue', async () => {
+    let calls = 0;
+    const client = new OpenRouterClient({
+      apiKey: 'sk-or-v1-test-key-0123456789abcdef',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      timeoutMs: 20,
+      maxRetries: 0,
+      fetchFn: async () => {
+        calls++;
+        if (calls === 1) return new Promise<never>(() => {});
+        return res(200, { data: { total_credits: 5, total_usage: 1 } });
+      },
+    });
+    await expect(client.getCredits()).rejects.toBeInstanceOf(OpenRouterNetworkError);
+    expect(calls).toBe(1);
+    // the queue drained: a subsequent call still runs
+    const credits = await client.getCredits();
+    expect(credits.totalCredits).toBe(5);
+    expect(calls).toBe(2);
+  });
+
+  it('getActivityAll follows links.next across pages', async () => {
+    const { client, calls } = makeClient(async (input) => {
+      if (input.includes('cursor=page2')) {
+        return res(200, {
+          data: [{ date: '2026-10-05', endpoint: 'b', requests: 2, spend_usd: 0.2, tokens: 20 }],
+          total_count: 2,
+          links: { next: null },
+        });
+      }
+      return res(200, {
+        data: [{ date: '2026-10-04', endpoint: 'a', requests: 1, spend_usd: 0.1, tokens: 10 }],
+        total_count: 2,
+        links: { next: 'page2' },
+      });
+    });
+    const page = await client.getActivityAll();
+    expect(page.data).toHaveLength(2);
+    expect(page.data.map((r) => r.endpoint)).toEqual(['a', 'b']);
+    expect(calls()).toHaveLength(2);
+  });
+
+  it('listModelsUser follows links.next across 3 pages', async () => {
+    const P1 = 'https://openrouter.ai/api/v1/models/user?cursor=p1';
+    const P2 = 'https://openrouter.ai/api/v1/models/user?cursor=p2';
+    const { client, calls } = makeClient(async (input) => {
+      if (input === P2) return res(200, { data: [{ id: 'm3' }], total_count: 3, links: { next: null } });
+      if (input === P1) return res(200, { data: [{ id: 'm2' }], total_count: 3, links: { next: P2 } });
+      return res(200, { data: [{ id: 'm1' }], total_count: 3, links: { next: P1 } });
+    });
+    const { models } = await client.listModelsUser();
+    expect(models.map((m) => m.id)).toEqual(['m1', 'm2', 'm3']);
+    expect(calls()).toHaveLength(3);
   });
 
   it('serializes concurrent calls (single-flight per key)', async () => {

@@ -5,10 +5,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { AppState, StyleSheet, Text, View } from 'react-native';
 import { CredentialService, createSecureKeyValueStore } from './src/core/credentials';
 import { OpenRouterClient } from './src/core/client';
-import { migrate, setSetting } from './src/store/daos';
+import { clearAllData, migrate, setSetting } from './src/store/daos';
 import { openDb, SqlDb } from './src/store/db';
 import { SyncEngine } from './src/sync/sync-engine';
 import OnboardingScreen from './src/ui/onboarding';
@@ -71,6 +71,15 @@ function Inner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // WS1-5: swap the sync cadence when the app moves between foreground/background.
+  useEffect(() => {
+    if (!engine) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      engine.setMode(state === 'active');
+    });
+    return () => sub.remove();
+  }, [engine]);
+
   if (stage === 'booting') {
     return (
       <View style={[styles.center, { backgroundColor: t.bg }]}>
@@ -114,9 +123,12 @@ function Inner() {
         db={ctx.db}
         onSignOut={() => {
           engine.stop();
-          void ctx.creds.clear();
-          void setSetting(ctx.db, 'credential.key_hash', '');
-          void setSetting(ctx.db, 'credential.key_prefix', '');
+          void (async () => {
+            await ctx.creds.clear();
+            await clearAllData(ctx.db);
+            await setSetting(ctx.db, 'credential.key_hash', '');
+            await setSetting(ctx.db, 'credential.key_prefix', '');
+          })();
           setEngine(null);
           setStage('onboarding');
         }}

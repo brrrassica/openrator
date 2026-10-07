@@ -6,3 +6,4 @@ dist/
 .DS_Store
 core.[0-9]*
 dist-ci/
+plans/
