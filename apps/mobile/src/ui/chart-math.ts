@@ -86,12 +86,12 @@ function polar(cx: number, cy: number, r: number, angle: number): Point {
   return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
 }
 
-/** USD formatting: $0.02, $1.23, $12.3, $1.2k, $1.5m. */
+/** USD formatting: $0.02, $1.23, $12.30, $1.2k, $1.5m. */
 export function fmtUsd(v: number): string {
   if (!Number.isFinite(v)) return '$0';
   if (v < 0) return `-${fmtUsd(-v)}`;
   if (v < 0.005) return '$0.00';
-  if (v < 1000) return `$${v.toFixed(v < 10 ? 2 : 1)}`;
+  if (v < 1000) return `$${v.toFixed(2)}`;
   if (v < 1_000_000) return `$${(v / 1000).toFixed(1)}k`;
   return `$${(v / 1_000_000).toFixed(1)}m`;
 }
@@ -102,8 +102,8 @@ export function fmtCount(n: number): string {
   return String(n);
 }
 
-/** Short "x/y remaining" ratio label, e.g. 3.2 / 4.0. */
+/** Short "x/y remaining" ratio label, e.g. 3.20 / 4.00. */
 export function limitLabel(remaining: number, limit: number): string {
   if (!Number.isFinite(limit) || limit === 0) return 'unlimited';
-  return `${remaining.toFixed(1)} / ${limit.toFixed(1)}`;
+  return `${remaining.toFixed(2)} / ${limit.toFixed(2)}`;
 }

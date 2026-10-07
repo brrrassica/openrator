@@ -24,7 +24,7 @@ import {
 import { SyncEngine, isStale } from '../sync/sync-engine';
 import { POLL } from '../core/config';
 import { DailyRollup, KeyRow, Provider } from '../core/types';
-import { computeHomeSummary, HomeSummary, resetLabel } from './home-summary';
+import { computeHomeSummary, HomeSummary, problemProviders, resetLabel } from './home-summary';
 import { fmtCount, fmtUsd, limitLabel } from './chart-math';
 import { BarRows, ResponsiveAreaChart } from './primitives';
 import { useTheme } from './theme';
@@ -39,6 +39,8 @@ interface HomeData {
   rollups: DailyRollup[];
   providers: Provider[];
   today: string;
+  creditsTotal: number;
+  creditsUsage: number;
 }
 
 export default function HomePane({ engine, db }: Props) {
@@ -50,13 +52,19 @@ export default function HomePane({ engine, db }: Props) {
   const load = useCallback(async () => {
     try {
       const hash = (await getSetting(db, 'credential.key_hash')) ?? '';
-      const [key, rollups, providers] = await Promise.all([
+      const [key, rollups, providers, creditsTotalRaw, creditsUsageRaw] = await Promise.all([
         hash ? getKeyRow(db, hash) : null,
         getDailyRollups(db),
         listProvidersFromDb(db),
+        getSetting(db, 'account.total_credits'),
+        getSetting(db, 'account.total_usage'),
       ]);
       const today = new Date().toISOString().slice(0, 10);
-      if (mounted.current) setData({ key, rollups, providers, today });
+      const creditsTotal = Number(creditsTotalRaw ?? 0) || 0;
+      const creditsUsage = Number(creditsUsageRaw ?? 0) || 0;
+      if (mounted.current) {
+        setData({ key, rollups, providers, today, creditsTotal, creditsUsage });
+      }
       // activity locked is derived from the engine's status instead
     } catch (e) {
       // keep last-known data; offline is fine
@@ -100,7 +108,11 @@ export default function HomePane({ engine, db }: Props) {
     today: data.today,
     staleCredits,
     activityLocked: Boolean(activityLocked),
+    creditsTotal: data.creditsTotal,
+    creditsUsage: data.creditsUsage,
   });
+  // Home health strip: only providers with a status page that are unhealthy.
+  const issues = problemProviders(summary.providers);
 
   return (
     <ScrollView
@@ -116,10 +128,44 @@ export default function HomePane({ engine, db }: Props) {
         </View>
       ) : null}
 
-      {/* Credits card */}
+      {/* OpenRouter account credits — the primary figure */}
       <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: t.text }]}>{summary.label || 'Key'}</Text>
+          <Text style={[styles.cardTitle, { color: t.text }]}>OpenRouter Credits</Text>
+          <View style={[styles.chip, { backgroundColor: t.border }]}>
+            <Text style={{ color: t.subtext, fontSize: 11 }}>account balance</Text>
+          </View>
+        </View>
+        <Text style={[styles.balance, { color: t.text }]}>
+          {fmtUsd(summary.creditsRemaining)}
+        </Text>
+        <Text style={{ color: t.subtext, fontSize: 13 }}>
+          {fmtUsd(summary.creditsUsage)} used of {fmtUsd(summary.creditsTotal)} purchased
+        </Text>
+        <View style={[styles.limitTrack, { backgroundColor: t.border }]}>
+          <View
+            style={{
+              width: `${
+                summary.creditsTotal > 0
+                  ? Math.min(100, (summary.creditsRemaining / summary.creditsTotal) * 100)
+                  : 0
+              }%`,
+              ...styles.limitFill,
+              backgroundColor:
+                summary.creditsTotal > 0 && summary.creditsRemaining / summary.creditsTotal < 0.1
+                  ? t.danger
+                  : t.ok,
+            }}
+          />
+        </View>
+      </View>
+
+      {/* API key usage / limits — secondary */}
+      <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+        <View style={styles.cardHeader}>
+          <Text style={[styles.cardTitle, { color: t.text }]}>
+            API Key — {summary.label || 'key'}
+          </Text>
           <View style={[styles.chip, { backgroundColor: t.border }]}>
             <Text style={{ color: t.subtext, fontSize: 11 }}>
               {resetLabel(summary.limitReset) || 'no limit'}
@@ -194,38 +240,40 @@ export default function HomePane({ engine, db }: Props) {
         )}
       </View>
 
-      {/* Health strip */}
+      {/* Health strip — only providers with a status page that are showing problems */}
       <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
         <Text style={[styles.cardTitle, { color: t.text }]}>
-          Upstream providers — {summary.providers.length} catalogued
+          Upstream providers — {issues.length} with issues
         </Text>
-        {summary.providers.slice(0, 8).map((p) => {
-          // WS2-9: health dot from the persisted snapshot state/last_ok_at.
-          const ageMs = p.lastOkAt ? Date.now() - new Date(p.lastOkAt).getTime() : Infinity;
-          const dotColor =
-            p.state !== 'ok' || !p.lastOkAt
-              ? t.subtext
-              : ageMs > 2 * 86_400_000
-                ? t.warn
-                : t.ok;
-          return (
-            <Pressable
-              key={p.slug}
-              style={styles.healthRow}
-              onPress={() => p.statusPageUrl && void Linking.openURL(p.statusPageUrl)}
-            >
-              <View style={[styles.healthDot, { backgroundColor: dotColor }]} />
-              <Text style={{ color: t.text, flex: 1 }} numberOfLines={1}>
-                {p.name}
-              </Text>
-              {p.statusPageUrl ? (
+        {issues.length === 0 ? (
+          <Text style={{ color: t.subtext, fontSize: 13 }}>
+            All upstream providers healthy.
+          </Text>
+        ) : (
+          issues.slice(0, 8).map((p) => {
+            // WS2-9: health dot from the persisted snapshot state/last_ok_at.
+            const ageMs = p.lastOkAt ? Date.now() - new Date(p.lastOkAt).getTime() : Infinity;
+            const dotColor =
+              p.state !== 'ok' || !p.lastOkAt
+                ? t.subtext
+                : ageMs > 2 * 86_400_000
+                  ? t.warn
+                  : t.ok;
+            return (
+              <Pressable
+                key={p.slug}
+                style={styles.healthRow}
+                onPress={() => p.statusPageUrl && void Linking.openURL(p.statusPageUrl)}
+              >
+                <View style={[styles.healthDot, { backgroundColor: dotColor }]} />
+                <Text style={{ color: t.text, flex: 1 }} numberOfLines={1}>
+                  {p.name}
+                </Text>
                 <Text style={{ color: t.accent, fontSize: 11 }}>status page ↗</Text>
-              ) : (
-                <Text style={{ color: t.subtext, fontSize: 11 }}>no status page</Text>
-              )}
-            </Pressable>
-          );
-        })}
+              </Pressable>
+            );
+          })
+        )}
       </View>
     </ScrollView>
   );
