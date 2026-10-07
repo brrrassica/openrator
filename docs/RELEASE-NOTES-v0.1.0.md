@@ -1,6 +1,7 @@
 # OpenRator v0.1.0 — release notes (draft)
 
-**Status:** code-complete + CI-verified; device pass pending (see `docs/04-qa-checklist.md`).
+**Status:** code-complete + CI-verified + **production APK built** (2026-10-07); device
+sideload/soak pending (see `docs/04-qa-checklist.md`).
 **Scope:** Android only (D6: iOS out of v0.1). Personal use (D4); distributed as a
 private APK — no store listing.
 
@@ -56,17 +57,23 @@ Bring-your-own-key, fully on-device: no backend, no accounts, no analytics SDK.
 
 ## Downloads
 
-- APK: produced via `eas build -p android --profile production` (see
-  `docs/04-qa-checklist.md` §4) — **attach the artifact to this release** after
-  the device pass; until then this release stays in draft.
+- APK (internal distribution, `production` profile):
+  https://expo.dev/artifacts/eas/kDDUS4vG-GEgcIWDhhmyoeA0vkc8WAwAbrrrkeHmR3U.apk
+  - EAS build `e6e1199a-c861-4d6f-b825-44d489276f47` · commit `805ac83` · SDK 57
+  - version `0.1.0` (versionCode 1) · 86.5 MB
+  - **Attach this artifact to the release** after the device pass; until then
+    this release stays in draft.
 
 ## Checksum / verification
 
-(Add SHA-256 of the APK here after the build.)
+- SHA-256: `0048671caed2ca7cd69dc8ba7d41080c6a8e41864214ca68f1d7186b41f3500b`
+  (`openrator-0.1.0.apk`, 86,462,142 bytes)
 
 ## Also in this release
 
-- 89 unit/integration tests (vitest), including a fixture-driven engine E2E over
+- 108 unit/integration tests (vitest), including a fixture-driven engine E2E over
   real SQLite that caught and fixed two first-launch blockers (`limit` reserved
   word, `undefined` bind on optional `/key` fields)
 - CI on every push: tests → typecheck → Android export (Gitea Actions)
+- EAS archive fix: removed an over-broad `apps/mobile/*.json` ignore that stripped
+  `package.json`/`app.json`/`eas.json` from the build archive

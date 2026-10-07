@@ -8,6 +8,10 @@
   `include_byok_in_limit` to create/patch bodies. `AdminKey.id` is now optional.
 - **WS2-7** Secure-store write failures are surfaced: `set()` throws instead of
   silently swallowing, so onboarding reports the error and does not advance.
+- **WS2-10** EAS production build unblocked: the root `.gitignore` rule
+  `apps/mobile/*.json` stripped `package.json`/`app.json`/`eas.json` from the build
+  archive, failing `PRE_INSTALL_HOOK` ("package.json does not exist"). Rule removed;
+  production APK now builds (build `e6e1199a…`, commit `805ac83`).
 
 ### Changed
 - **WS2-2** Batched DB writes (`upsertActivityRows`, `replaceDailyRollups`, provider
