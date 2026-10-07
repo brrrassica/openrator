@@ -185,6 +185,8 @@ export interface KeyRow {
 export interface AdminKey {
   id?: string;
   hash: string;
+  /** Human-readable key name (preferred display name when present). */
+  name?: string;
   label: string;
   created: number;
   limit: number;

@@ -35,6 +35,24 @@ interface Props {
 const RESETS = ['daily', 'weekly', 'monthly'] as const;
 type Reset = (typeof RESETS)[number] | '';
 
+/**
+ * Human-readable name for a key. OpenRouter returns the human name in `name`
+ * and may echo the key hash in `label`; prefer `name`, fall back to a
+ * non-hash-like `label`, and otherwise return '' so callers can decide on a
+ * placeholder. This keeps rows from reading as a bare hash identifier.
+ */
+function keyHumanName(ak: AdminKey): string {
+  const candidate = (ak.name || ak.label || '').trim();
+  if (!candidate) return '';
+  if (/^sk-or-/i.test(candidate) || /^[0-9a-f]{16,}$/i.test(candidate)) return '';
+  return candidate;
+}
+
+/** Display name for a key row, with an explicit placeholder when unnamed. */
+function keyDisplayName(ak: AdminKey): string {
+  return keyHumanName(ak) || '(unnamed)';
+}
+
 export default function KeysPane({ engine, db, onSignOut }: Props) {
   const t = useTheme();
   const [key, setKey] = useState<KeyRow | null>(null);
@@ -148,17 +166,20 @@ export default function KeysPane({ engine, db, onSignOut }: Props) {
                 accessibilityRole="button"
               >
                 <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={{ color: t.text, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
-                    {ak.label || '(unnamed)'}
-                    {ak.isManagementKey ? ' · mgmt' : ''}
-                  </Text>
                   <Text style={{ color: t.subtext, fontSize: 10 }}>
                     {ak.hash.slice(0, 8)} · {fmtUsd(ak.usageMonthly)}/mo
                     {ak.limit > 0 ? ` · limit ${fmtUsd(ak.limit)} (${fmtUsd(ak.limitRemaining)} left)` : ''}
                     {ak.limitReset ? ` · ${ak.limitReset}` : ''}
                   </Text>
                 </View>
-                <Text style={{ color: t.subtext, fontSize: 11 }}>
+                <Text
+                  style={{ color: t.text, fontSize: 13, fontWeight: '700', textAlign: 'right', flexShrink: 1 }}
+                  numberOfLines={1}
+                >
+                  {keyDisplayName(ak)}
+                  {ak.isManagementKey ? ' · mgmt' : ''}
+                </Text>
+                <Text style={{ color: t.subtext, fontSize: 11, marginLeft: 8 }}>
                   {editingId === ak.hash ? '▴' : '▾'}
                 </Text>
               </Pressable>
@@ -238,7 +259,7 @@ function KeyEditor({
   theme: ReturnType<typeof useTheme>;
   onDone: () => Promise<void>;
 }) {
-  const [label, setLabel] = useState(adminKey.label ?? '');
+  const [label, setLabel] = useState(keyHumanName(adminKey));
   const [limit, setLimit] = useState(adminKey.limit > 0 ? String(adminKey.limit) : '');
   const [reset, setReset] = useState<Reset>(adminKey.limitReset ?? '');
   const [expires, setExpires] = useState(adminKey.expiresAt ?? '');
@@ -264,7 +285,7 @@ function KeyEditor({
 
   const revoke = () => {
     Alert.alert(
-      `Revoke ${adminKey.label || 'key'}?`,
+      `Revoke ${keyHumanName(adminKey) || 'key'}?`,
       'This cannot be undone. Requests using this key will start failing immediately.',
       [
         { text: 'Cancel', style: 'cancel' },
