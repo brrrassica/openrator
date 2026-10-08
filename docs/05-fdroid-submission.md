@@ -76,17 +76,23 @@ fdroid update --create-metadata
 
 ## Local recipe validation notes (2026-10-08, opencode-sam host)
 
-Validated end-to-end with `fdroid build -t` (fdroidserver 2.4.2, JDK 21,
-node 22.23.1, SDK at `/opt/android-sdk` via `sdk_path` in `config.yml`):
-clone at tag -> subdir `apps/mobile` -> `npm ci` -> `npx expo prebuild
---platform android --clean --no-install` -> `./gradlew assembleRelease`.
-Expo prebuild and the gradle configure phase are clean; the RN/Expo gradle
-plugins self-provision the Android NDK into the SDK dir, so the recipe needs
-no `ndk:` metadata.
+**Verdict: PASS** — `fdroid build -t --server tech.alatcerdas.openrator`
+succeeded (3/3 runs) with fdroidserver 2.4.2 + JDK 21 + node 22 + Android SDK
+(`sdk_path: /opt/android-sdk` in `config.yml`). Full pipeline verified:
+clone at tag `v0.1.1` -> subdir `apps/mobile` -> `npm ci` -> `npx expo prebuild
+--platform android --clean --no-install` -> `./gradlew assembleRelease`
+(569 tasks) -> fdroid's APK check of app id / versionName / versionCode.
+Expo/RN gradle plugins self-provision the NDK into the SDK dir, so the recipe
+needs no `ndk:` metadata.
 
-Host gotcha (not a repo problem): agents that run node under an IPC channel
-set `NODE_CHANNEL_FD` in the environment, which makes node >= 22
-SIGABRT on exit (libuv `uv__epoll_ctl_flush` during `LegacyTracingAgent`
-teardown). Unset it (and `NODE_CHANNEL_SERIALIZATION_MODE`, `NODE_APP_INSTANCE`)
-for the console and build steps. On a vanilla console or F-Droid's buildbot
-this does not occur.
+Environment notes (host-specific, not recipe problems):
+- Agents that run node under an IPC channel set `NODE_CHANNEL_FD` in the
+  environment; node >= 22 then SIGABRTs on exit (libuv `uv__epoll_ctl_flush`
+  during `LegacyTracingAgent` teardown). Unset `NODE_CHANNEL_FD`,
+  `NODE_CHANNEL_SERIALIZATION_MODE`, `NODE_APP_INSTANCE` for build steps.
+- The Kotlin/ksp step can hit `OutOfMemoryError: Metaspace`; export
+  `JAVA_TOOL_OPTIONS='-XX:MaxMetaspaceSize=2g -Xmx6g'` for gradle.
+- `fdroid lint` validates `Categories` against the store list — OpenRator uses
+  `AI Chat` (LLM interfaces), which is valid. (Lint may still complain about
+  missing `config/category_*.png` icons in a minimal local repo replica; that
+  is a ``cosmetic asset step, satisfied by the real fdroiddata checkout.)
