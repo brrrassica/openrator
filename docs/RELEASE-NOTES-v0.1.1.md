@@ -26,7 +26,7 @@ carry the new id:
 
 ## Build & downloads
 
-- F-Droid builds from **tag `v0.1.1`** (commit `da462ed`, expected
+- F-Droid builds from **tag `v0.1.1`** (commit `46beea9`, expected
   output: `android/app/build/outputs/apk/release/app-release.apk`)
 - Local sideload artifact (as before): `eas build -p android --profile production`
 - v0.1.0 EAS artifact (superseded):
