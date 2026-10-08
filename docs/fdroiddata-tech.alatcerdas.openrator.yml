@@ -10,7 +10,7 @@ maintainer (Expo/RN builds are fiddly).
 
 ```yaml
 Categories:
-  - Internet
+  - AI Chat
 License: MIT
 AuthorName: Sam Ralial
 AuthorEmail: sam@alatcerdas.tech
