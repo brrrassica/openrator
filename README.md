@@ -16,19 +16,21 @@ v0.1).
 - **M2 ✅** Home Pane — themed shell, custom SVG charts, credits card, 14-day spend trend, health strip, pull-to-refresh.
 - **M3 ✅** Spend & Endpoint analytics (30-day area chart, endpoint/provider breakdowns, no-mgmt fallback).
 - **M4 ✅** Provider Policy & Keys — catalog, preset routing editor with optimistic writes, mgmt-key CRUD + create/reveal flow.
-- **M5 ✅** Hardening, QA, release — secrets guard + engine E2E, a11y/theming pass, and a **production APK built via EAS** (build `e6e1199a…`, commit `805ac83`). Device sideload + 72 h soak remain (physical-device-only; `docs/04-qa-checklist.md`).
+- **M5 ✅** Hardening, QA, release — secrets guard + engine E2E, a11y/theming pass, production APK built via EAS, and **v0.1.0 soak passed** (days of device testing, 2026-10-08).
 
 ## Release (v0.1)
 
-Version `0.1.0` builds via `eas build -p android --profile production` (production
-channel, Android APK for sideload — no store listing in v0.1). The current artifact
-was built 2026-10-07:
+Version `0.1.1` is the first **F-Droid-facing** release (Android app id
+`tech.alatcerdas.openrator`, MIT licensed). It adds no user-facing features over
+tested v0.1.0 — the app-id change is what F-Droid builds from source (tag
+`v0.1.1`). Local builds via `eas build -p android --profile production`.
+
+v0.1.0 (2026-10-07, EAS-sideload) passed days of device testing; its artifact:
 
 - APK: https://expo.dev/artifacts/eas/kDDUS4vG-GEgcIWDhhmyoeA0vkc8WAwAbrrrkeHmR3U.apk
 - SHA-256: `0048671caed2ca7cd69dc8ba7d41080c6a8e41864214ca68f1d7186b41f3500b`
 
-Release runbook: `docs/04-qa-checklist.md` §4. Physical-device-only items
-(mgmt-key acceptance, sideload, soak) are tracked there.
+Release runbooks: `docs/04-qa-checklist.md` §4, `docs/05-fdroid-submission.md`.
 
 ## Docs
 

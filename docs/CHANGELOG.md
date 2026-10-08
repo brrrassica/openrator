@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.1] — 2026-10-08 — F-Droid prep
+First release aimed at the F-Droid storefront; no user-facing feature changes over
+v0.1.0 (which passed days of device testing).
+
+### Changed
+- Android app id `ai.openrator.app` → `tech.alatcerdas.openrator` (`app.json`);
+  `versionCode` 1 → 2.
+- License MIT (`LICENSE` root + `apps/mobile/LICENSE`; Expo-template license
+  preserved as `apps/mobile/LICENSE.expo-template`). `package.json` license field
+  `0BSD` → `MIT`.
+- Upstream store metadata added (Fastlane/Triple-T at repo root: description,
+  icon 512 px, changelogs, phoneScreenshots placeholder).
+- Docs: fdroiddata metadata draft (`docs/fdroiddata-tech.alatcerdas.openrator.yml`)
+  + submission runbook (`docs/05-fdroid-submission.md`).
+
 ## [Unreleased] — WS2 (P1 robustness & UX)
 
 ### Fixed
