@@ -49,7 +49,7 @@ Builds:
     versionCode: 2
     # FIXME: set to the short commit hash of the v0.1.1 tag (created when the
     # app-id change ships; see docs/05-fdroid-submission.md step 2).
-    commit: 0000000000000000000000000000000000000000
+    commit: 224ffe1cca18eec571235d00d3e837b5c2ecfd3b
     subdir: apps/mobile
     init:
       - npm ci
