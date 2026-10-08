@@ -73,3 +73,20 @@ fdroid update --create-metadata
 # serve the fdroid/ dir over HTTPS, then add https://<host>/fdroid/repo/ in the
 # F-Droid client (Manage repos)
 ```
+
+## Local recipe validation notes (2026-10-08, opencode-sam host)
+
+Validated end-to-end with `fdroid build -t` (fdroidserver 2.4.2, JDK 21,
+node 22.23.1, SDK at `/opt/android-sdk` via `sdk_path` in `config.yml`):
+clone at tag -> subdir `apps/mobile` -> `npm ci` -> `npx expo prebuild
+--platform android --clean --no-install` -> `./gradlew assembleRelease`.
+Expo prebuild and the gradle configure phase are clean; the RN/Expo gradle
+plugins self-provision the Android NDK into the SDK dir, so the recipe needs
+no `ndk:` metadata.
+
+Host gotcha (not a repo problem): agents that run node under an IPC channel
+set `NODE_CHANNEL_FD` in the environment, which makes node >= 22
+SIGABRT on exit (libuv `uv__epoll_ctl_flush` during `LegacyTracingAgent`
+teardown). Unset it (and `NODE_CHANNEL_SERIALIZATION_MODE`, `NODE_APP_INSTANCE`)
+for the console and build steps. On a vanilla console or F-Droid's buildbot
+this does not occur.
