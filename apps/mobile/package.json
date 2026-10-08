@@ -1,7 +1,7 @@
 {
   "name": "openrator",
   "description": "OpenRator — single-pane OpenRouter dashboard for Android (Expo/React Native).",
-  "license": "0BSD",
+  "license": "MIT",
   "version": "0.1.0",
   "main": "index.ts",
   "dependencies": {

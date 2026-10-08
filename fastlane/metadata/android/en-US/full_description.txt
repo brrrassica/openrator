@@ -1,0 +1,10 @@
+OpenRator is a single-pane dashboard for your OpenRouter account, built for Android with Expo / React Native. It keeps your API keys on-device and talks to OpenRouter directly — no backend, bring your own key.
+
+Features:
+- Home: credits at a glance, 14-day spend trend, provider health strip, pull-to-refresh
+- Spend & Endpoint analytics: 30-day usage chart with provider and endpoint breakdowns
+- Provider Policy editor: catalog browsing, routing presets with optimistic writes
+- Keys: management-key CRUD, create and reveal flows, clear-on-sign-out
+- Privacy: everything stored on-device (SQLite, SecureStore), no trackers, no ads, no accounts
+
+OpenRator is an independent tool and is not affiliated with or endorsed by OpenRouter.

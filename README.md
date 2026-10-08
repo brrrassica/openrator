@@ -37,6 +37,8 @@ Release runbook: `docs/04-qa-checklist.md` §4. Physical-device-only items
 - [`docs/03-spike-notes.md`](docs/03-spike-notes.md) — live API spike results (2026-10-05)
 - [`docs/04-ci-notes.md`](docs/04-ci-notes.md) — CI setup & ops notes (GitHub Actions + self-hosted Gitea/act_runner)
 - [`docs/04-qa-checklist.md`](docs/04-qa-checklist.md) — v0.1 acceptance + device matrix (M5)
+- [`docs/05-fdroid-submission.md`](docs/05-fdroid-submission.md) — F-Droid release prep & submission
+- [`docs/fdroiddata-tech.alatcerdas.openrator.yml`](docs/fdroiddata-tech.alatcerdas.openrator.yml) — fdroiddata metadata draft
 - [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — changelog
 - [`docs/RELEASE-NOTES-v0.1.0.md`](docs/RELEASE-NOTES-v0.1.0.md) — v0.1.0 release notes
 

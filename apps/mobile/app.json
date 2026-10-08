@@ -10,7 +10,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "ai.openrator.app",
+      "package": "tech.alatcerdas.openrator",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

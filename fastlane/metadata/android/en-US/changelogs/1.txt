@@ -1,0 +1,1 @@
+v0.1.0: Credits and spend analytics, endpoint/provider breakdowns, provider policy editor, API key management. On-device secure storage, no accounts.
