@@ -95,4 +95,10 @@ Environment notes (host-specific, not recipe problems):
 - `fdroid lint` validates `Categories` against the store list — OpenRator uses
   `AI Chat` (LLM interfaces), which is valid. (Lint may still complain about
   missing `config/category_*.png` icons in a minimal local repo replica; that
-  is a ``cosmetic asset step, satisfied by the real fdroiddata checkout.)
+  is a cosmetic asset step, satisfied by the real fdroiddata checkout.)
+
+## MR description
+
+When opening the merge request, use the paste-ready description (F-Droid's
+"App inclusion" template, filled in) in `docs/fdroid-mr-description.md`. Title
+must be exactly `New app: OpenRator`.
