@@ -82,12 +82,15 @@ native Android OpenRouter client in F-Droid.
 - [x] AuthorName added: Sam Ralial.
 - [x] No external repos — all deps are npm packages fetched by the build
       (no srclibs, no git submodules).
-- [ ] Reproducible Builds — **not enabled yet**, reason: the recipe is pinned by
-      `package-lock.json` and the RN/Expo gradle toolchains, but the author-side
-      release pipeline (key handling, EAS artifact publication) is not set up.
-      Happy to enable before merge if a maintainer prefers — otherwise I
-      understand the APK will be signed with F-Droid's key and this cannot be
-      switched later; please advise.
+- [x] Reproducible Builds — **enabled, developer-signed (exclusively)**: the
+      app will publish APKs signed by the author's key. Metadata carries
+      `Binaries:` (signed APK on GitHub Releases, `%v`-substituted) and
+      `AllowedAPKSigningKeys:` (SHA-256 fingerprint of the signing cert).
+      F-Droid publishes our APK only if the recipe rebuild is byte-identical;
+      versions that fail the check are skipped, never signed with F-Droid's
+      key. Consequences are understood; the toolchain is pinned (npm
+      lockfile, JDK 21, Android build-tools 36). `Binaries:`/`AllowedAPKSigningKeys:`
+      will be filled in once the v0.1.1 signed asset is on GitHub Releases.
 - [ ] ABI split — not yet: the release APK is ~86 MB (4 ABIs). I'd rather ship
       the first release unsplit; can add splits in the next version if
       maintainers recommend it.
@@ -111,9 +114,13 @@ native Android OpenRouter client in F-Droid.
   → `./gradlew assembleRelease` completes and the APK checks pass (app id
   `tech.alatcerdas.openrator`, versionName `0.1.1`, versionCode `2`). Details in
   `MaintainerNotes`.
-- **AntiFeatures: NonFreeNet is intentional** — the app depends entirely on the
-  proprietary OpenRouter API (BYOK). If the reviewer considers that inapplicable
-  or you'd prefer it added differently, tell me and I'll adjust.
+- **AntiFeatures: NonFreeNet is intentional** — the app depends entirely on
+  the proprietary OpenRouter API (BYOK). Precedent in the catalog: Telegram
+  FOSS, WhatsApp Transmitter, SlimSocial for Twitter/Facebook, YouTube
+  Cacher etc. carry the same badge. If the reviewer disagrees it applies,
+  removing the line is trivial; we'll drop it ourselves once the app gains a
+  configurable OpenAI-compatible base URL (then it no longer depends
+  entirely on one service).
 - **versionCode 2 is the first F-Droid build on purpose**: v0.1.0 was
   sideloaded via EAS under the old application id `ai.openrator.app`, so it is
   not reusable; 0.1.1 is the first release carrying `tech.alatcerdas.openrator`.

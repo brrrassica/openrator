@@ -25,6 +25,15 @@ Changelog: https://github.com/brrrassica/openrator/blob/main/docs/CHANGELOG.md
 AutoName: OpenRator
 Name: OpenRator
 
+# Author-signed reproducible builds — enable once the first signed release
+# asset exists (see docs/05-fdroid-submission.md "Self-signed reproducible
+# builds"). Modeled on metadata/zatrit.skinbread.yml. Fingerprint = lowercase
+# sha256 of the v2+ signing certificate: apksigner verify --print-certs ...
+#Binaries:
+#  - https://github.com/brrrassica/openrator/releases/download/v%v/app-release.apk
+#AllowedAPKSigningKeys:
+#  - <64 hex fingerprint>
+
 Description: |
   OpenRator is a single-pane dashboard for your OpenRouter account, built for
   Android with Expo / React Native. It keeps your API keys on-device and talks

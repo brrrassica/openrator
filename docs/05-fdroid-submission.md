@@ -97,6 +97,47 @@ Environment notes (host-specific, not recipe problems):
   missing `config/category_*.png` icons in a minimal local repo replica; that
   is a cosmetic asset step, satisfied by the real fdroiddata checkout.)
 
+## Self-signed reproducible builds (decision: YES, author-signed)
+
+Chosen mode per the [Reproducible Builds](https://f-droid.org/docs/Reproducible_Builds/)
+docs: **exclusively developer-signed** — fdroiddata metadata gains
+`Binaries:` + `AllowedAPKSigningKeys:`, F-Droid rebuilds the recipe and only
+publishes our APK if it is byte-identical (it never publishes an F-Droid-key
+APK; a non-matching version is skipped, not signed).
+
+```yaml
+# app-level fields, mirrors real apps e.g. metadata/zatrit.skinbread.yml
+# (which publishes app-release.apk — same filename as our recipe output!)
+Binaries:
+  - https://github.com/brrrassica/openrator/releases/download/v%v/app-release.apk
+AllowedAPKSigningKeys:
+  - <64 hex chars, lowercase sha256 of the v2+ signing certificate>
+```
+
+Getting the fingerprint (Build Metadata Reference): `apksigner verify
+--print-certs app-release.apk | grep SHA-256` (or `keytool -printcert -jarfile ...`).
+`AllowedAPKSigningKeys` is enforced by `fdroid update` (fdroidserver
+update.py) and only accepts v2/v3-signed APKs.
+
+Release + signing flow per version (v0.1.1 first):
+
+1. Generate the keystore ONCE (never commit it; backup encrypted):
+   `keytool -genkeypair -alias openrator -keyalg RSA -keysize 4096 -validity     10000 -keystore openrator.jks` — store password manager/encrypted backup.
+2. GitHub Actions workflow (pinned toolchain: Node from `package.json`
+   engines/.nvmrc, JDK 21, Android build-tools 36, `npm ci` lockfile):
+   build unsigned APK via `expo prebuild + ./gradlew assembleRelease`.
+3. Sign: `apksigner sign --ks openrator.jks --ks-key-alias openrator \
+   --ks-pass pass:<pw> app-release.apk` (v2/v3 default). Secrets in GH Actions.
+4. Attach signed APK to the version's GitHub Release — `Binaries:` URL
+   resolves with `%v` = versionName.
+5. Reproducibility proof before merge: run the recipe twice locally, compare
+   `sha256sum` of unsigned APKs; then compare with the fdroiddata MR pipeline
+   artifact; diffoscope for any drift.
+
+Consequence to state in the MR: if our published APK ever diverges from the
+fdroiddata rebuild, that version is skipped (no update). Mitigation: locked
+toolchain + CI reproduction per release.
+
 ## MR description
 
 When opening the merge request, use the paste-ready description (F-Droid's
