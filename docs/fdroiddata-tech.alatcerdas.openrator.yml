@@ -11,6 +11,8 @@ maintainer (Expo/RN builds are fiddly).
 ```yaml
 Categories:
   - AI Chat
+AntiFeatures:
+  - NonFreeNet
 License: MIT
 AuthorName: Sam Ralial
 AuthorEmail: sam@alatcerdas.tech
@@ -73,9 +75,15 @@ MaintainerNotes: |
   `expo prebuild` and is NOT committed (gitignored), so every build must run
   prebuild first. npm (current Node) is allowed per inclusion policy.
 
-  First F-Droid build must be v0.1.1 (versionCode 2): the v0.1.0 APK was built
-  with the old app id ai.openrator.app, so it cannot be used. Tag v0.1.1 after
-  this prep commit ships, then fill in the commit hash above.
+  Recipe validated locally 2026-10-08 with fdroid build --test
+  (fdroidserver 2.4.2): the pipeline clone -> npm ci -> expo prebuild --clean
+  -> ./gradlew assembleRelease completes and fdroid's APK checks pass (app id
+  tech.alatcerdas.openrator, versionCode 2). The RN/Expo gradle plugins
+  self-provision the Android NDK into the SDK dir, so no ndk: metadata is
+  needed.
+
+  First F-Droid build is v0.1.1 (versionCode 2): v0.1.0 was sideloaded via EAS
+  under the old app id ai.openrator.app, so it is not reusable.
 
   If the build environment JDK defaults bite (RN 0.86 needs a recent JDK), apply
   the jvmToolchain 17->21 seds from templates/build-react-native.yml to
