@@ -11,6 +11,10 @@ on:
 jobs:
   mobile-checks:
     runs-on: [self-hosted, opencode-sam]
+    # The runner's ~/.npm cache is persistent and shared by every runner
+    # instance, so npm restores tarballs from the local disk instead of
+    # re-downloading them. setup-node's `cache: npm` would instead push this to
+    # the GitHub cache service and pull it back over the network every run.
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -19,8 +23,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
 
       - name: Install
         working-directory: apps/mobile
