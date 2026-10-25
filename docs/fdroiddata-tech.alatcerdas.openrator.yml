@@ -27,7 +27,7 @@ AntiFeatures:
 # Uncomment the following two lines once the first signed release asset
 # exists (v0.1.1 or later):
 #
-#Binaries:
-#  - https://github.com/brrrassica/openrator/releases/download/v%v/app-release.apk
-#AllowedAPKSigningKeys:
-#  - b3ccb3f651aee39b5a21ff8ac919ec21d26d28e3bc17e6de892e541f0a067692
+Binaries:
+  - https://github.com/brrrassica/openrator/releases/download/v%v/app-release.apk
+AllowedAPKSigningKeys:
+  - b3ccb3f651aee39b5a21ff8ac919ec21d26d28e3bc17e6de892e541f0a067692
