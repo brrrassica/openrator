@@ -1,0 +1,33 @@
+Repo: https://github.com/brrrassica/openrator
+Commit: main (pinned to a tag at release time)
+
+AutoName: OpenRator
+Name: OpenRator
+
+# AntiFeatures: NonFreeNet — the app depends entirely on the proprietary
+# OpenRouter API (BYOK). Drop this once a configurable OpenAI-compatible
+# base URL is added (then it no longer depends entirely on one service).
+AntiFeatures:
+  - NonFreeNet
+
+# === Self-signed reproducible builds (developer-signed, exclusive mode) ===
+# See docs/05-fdroid-submission.md for the full rationale and flow.
+#
+# The keystore fingerprint (SHA-256, lowercase hex, no colons) is:
+#   b3ccb3f651aee39b5a21ff8ac919ec21d26d28e3bc17e6de892e541f0a067692
+# Generated 2026-10-25 on opencode-sam, RSA-4096, alias=openrator.
+#
+# Binaries: URL to the author-signed APK on GitHub Releases.
+# F-Droid rebuilds the recipe; if the rebuild is byte-identical, the
+# author-signed APK is published. If not, that version is skipped.
+#
+# AllowedAPKSigningKeys: the SHA-256 fingerprint of the signing cert.
+# F-Droid enforces that only APKs signed by this key are published.
+#
+# Uncomment the following two lines once the first signed release asset
+# exists (v0.1.1 or later):
+#
+#Binaries:
+#  - https://github.com/brrrassica/openrator/releases/download/v%v/app-release.apk
+#AllowedAPKSigningKeys:
+#  - b3ccb3f651aee39b5a21ff8ac919ec21d26d28e3bc17e6de892e541f0a067692
