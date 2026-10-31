@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { CredentialService } from '../core/credentials';
+import { BrandMark } from './brand-mark';
 import { useTheme } from './theme';
 
 interface Props {
@@ -44,7 +45,11 @@ export default function OnboardingScreen({ creds, onDone, onError }: Props) {
 
   return (
     <View style={[styles.wrap, { backgroundColor: t.bg }]}>
+      <View style={styles.brand}>
+        <BrandMark size={56} color={t.accent} />
+      </View>
       <Text style={[styles.title, { color: t.text }]}>Welcome to OpenRator</Text>
+      <Text style={[styles.tagline, { color: t.subtext }]}>One pane for every AI bill</Text>
       <Text style={[styles.body, { color: t.subtext }]}>
         Paste your OpenRouter API key (sk-or-v1-…). It is stored only on this
         device and sent only to openrouter.ai over TLS. OpenRator never logs it.
@@ -120,7 +125,9 @@ export default function OnboardingScreen({ creds, onDone, onError }: Props) {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, padding: 24, justifyContent: 'center' },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
+  brand: { alignSelf: 'center', marginBottom: 10 },
+  title: { fontSize: 22, fontWeight: '700', marginBottom: 4 },
+  tagline: { fontSize: 13, marginBottom: 14 },
   body: { fontSize: 14, lineHeight: 20, marginBottom: 16 },
   pasteWarn: {
     borderStyle: 'dashed',

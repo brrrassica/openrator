@@ -2,15 +2,18 @@
 
 [![CI](https://github.com/brrrassica/openrator/actions/workflows/ci.yml/badge.svg)](https://github.com/brrrassica/openrator/actions)
 
-Single-pane-of-glass Android app for your **OpenRouter** usage. Credits at a
-glance, spend & endpoint analytics, upstream provider policy controls, and API
-key oversight — built with Expo / React Native, BYOK on-device (no backend in
-v0.1).
+![OpenRator — one pane for every AI bill](docs/assets/social-preview.png)
+
+Single-pane-of-glass Android app for your **AI spend** — starting with
+**OpenRouter**, expanding to **OpenCode Zen** in v0.2. Credits at a glance, spend
+& endpoint analytics, upstream provider policy controls, and API key oversight —
+built with Expo / React Native, BYOK on-device (no backend).
 
 *The name: OpenRouter + Operator.* (I know it sucks)
 
 ## Status
 
+- **v0.2.0 🚧** Multi-provider core, brand refresh, and local alerts — plan in [`plans/v0.2.0-plan.md`](plans/v0.2.0-plan.md). Brand workstream (M6) is in progress.
 - **M0 ✅** Foundation & API spikes — verified live 2026-10-05 (`docs/03-spike-notes.md`). Generation-list spike **pivoted the product to Spend & Endpoint analytics** (D7).
 - **M1 ✅** Data & client layer — secure-store credentials, typed API client, sync engine, SQLite DAOs, rollups.
 - **M2 ✅** Home Pane — themed shell, custom SVG charts, credits card, 14-day spend trend, health strip, pull-to-refresh.
@@ -32,11 +35,13 @@ Release runbook: `docs/04-qa-checklist.md` §4. Physical-device-only items
 
 ## Docs
 
+- [`plans/v0.2.0-plan.md`](plans/v0.2.0-plan.md) — v0.2.0 multi-provider + brand + alerts plan
 - [`docs/01-specification.md`](docs/01-specification.md) — product spec, verified API surface, architecture, decisions
 - [`docs/02-roadmap-v0.1.md`](docs/02-roadmap-v0.1.md) — v0.1 roadmap (M0–M5), effort, exit criteria
 - [`docs/03-spike-notes.md`](docs/03-spike-notes.md) — live API spike results (2026-10-05)
 - [`docs/04-ci-notes.md`](docs/04-ci-notes.md) — CI setup & ops notes (GitHub Actions + self-hosted Gitea/act_runner)
 - [`docs/04-qa-checklist.md`](docs/04-qa-checklist.md) — v0.1 acceptance + device matrix (M5)
+- [`docs/06-brand-guide.md`](docs/06-brand-guide.md) — mark, palette, typography, icon grid, asset pipeline
 - [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — changelog
 - [`docs/RELEASE-NOTES-v0.1.0.md`](docs/RELEASE-NOTES-v0.1.0.md) — v0.1.0 release notes
 
@@ -44,9 +49,11 @@ Release runbook: `docs/04-qa-checklist.md` §4. Physical-device-only items
 
 ```sh
 cd apps/mobile
-npm test          # vitest unit suite
-npm run typecheck # tsc --noEmit
-npm start         # Expo dev server
+npm test            # vitest unit suite
+npm run typecheck   # tsc --noEmit
+npm start           # Expo dev server
+npm run assets:build # regenerate brand PNGs from SVG masters
+npm run assets:check # fail on asset drift (CI)
 ```
 
 Commits auto-push to the self-hosted mirror via the versioned hook

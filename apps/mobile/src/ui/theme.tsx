@@ -24,31 +24,31 @@ export interface Theme {
 }
 
 const LIGHT: Omit<Theme, 'mode' | 'spacing' | 'radius'> = {
-  bg: '#f6f7f9',
-  card: '#ffffff',
-  text: '#14161a',
-  subtext: '#6b7280',
-  border: '#e5e7eb',
-  accent: '#111827',
-  accentText: '#ffffff',
-  warn: '#b45309',
-  danger: '#b91c1c',
-  ok: '#15803d',
-  chart: ['#111827', '#2563eb', '#0891b2', '#7c3aed', '#db2777', '#ca8a04'],
+  bg: '#F5F8FC',
+  card: '#FFFFFF',
+  text: '#0B1220',
+  subtext: '#5B6B7F',
+  border: '#DCE5EF',
+  accent: '#0369A1',
+  accentText: '#FFFFFF',
+  warn: '#B45309',
+  danger: '#B91C1C',
+  ok: '#15803D',
+  chart: ['#0A74D8', '#0FB5EF', '#0891B2', '#7C3AED', '#D97706', '#DB2777'],
 };
 
 const DARK: Omit<Theme, 'mode' | 'spacing' | 'radius'> = {
-  bg: '#0e1116',
-  card: '#1a1f27',
-  text: '#e7eaf0',
-  subtext: '#9aa3b2',
-  border: '#2a313c',
-  accent: '#3b82f6',
-  accentText: '#ffffff',
-  warn: '#f59e0b',
-  danger: '#f87171',
-  ok: '#4ade80',
-  chart: ['#3b82f6', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#60a5fa'],
+  bg: '#0B1220',
+  card: '#141C2A',
+  text: '#E7EDF5',
+  subtext: '#9AA9BC',
+  border: '#263244',
+  accent: '#38BDF8',
+  accentText: '#062033',
+  warn: '#FBBF24',
+  danger: '#F87171',
+  ok: '#4ADE80',
+  chart: ['#38BDF8', '#22D3EE', '#A78BFA', '#F472B6', '#FBBF24', '#60A5FA'],
 };
 
 const ThemeCtx = createContext<Theme | null>(null);

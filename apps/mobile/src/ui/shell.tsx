@@ -12,15 +12,17 @@ import SpendPane from './spend-pane';
 import CatalogPane from './catalog-pane';
 import PolicyPane from './policy-pane';
 import KeysPane from './keys-pane';
+import { BrandMark } from './brand-mark';
+import { Icon, IconName } from './icons';
 import { useTheme } from './theme';
 
 export type Tab = 'home' | 'spend' | 'providers' | 'keys';
 
-const TABS: Array<{ id: Tab; icon: string; label: string }> = [
-  { id: 'home', icon: '🏠', label: 'Home' },
-  { id: 'spend', icon: '📊', label: 'Spend' },
-  { id: 'providers', icon: '🌐', label: 'Providers' },
-  { id: 'keys', icon: '🔑', label: 'Keys' },
+const TABS: Array<{ id: Tab; icon: IconName; label: string }> = [
+  { id: 'home', icon: 'home', label: 'Home' },
+  { id: 'spend', icon: 'spend', label: 'Spend' },
+  { id: 'providers', icon: 'providers', label: 'Providers' },
+  { id: 'keys', icon: 'keys', label: 'Keys' },
 ];
 
 const TITLES: Record<Tab, string> = {
@@ -43,7 +45,10 @@ export default function Shell({ engine, db, onSignOut }: Props) {
   return (
     <View style={[styles.root, { backgroundColor: t.bg }]}>
       <View style={[styles.header, { backgroundColor: t.card, borderBottomColor: t.border }]}>
-        <Text style={[styles.headerTitle, { color: t.text }]}>{TITLES[tab]}</Text>
+        <View style={styles.brandRow}>
+          <BrandMark size={22} color={t.accent} />
+          <Text style={[styles.headerTitle, { color: t.text }]}>{TITLES[tab]}</Text>
+        </View>
       </View>
 
       <View style={styles.body}>
@@ -64,7 +69,7 @@ export default function Shell({ engine, db, onSignOut }: Props) {
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
             >
-              <Text style={{ fontSize: 18 }}>{tb.icon}</Text>
+              <Icon name={tb.icon} size={21} color={active ? t.accent : t.subtext} />
               <Text
                 style={{ fontSize: 11, color: active ? t.accent : t.subtext, fontWeight: active ? '700' : '400' }}
               >
@@ -134,7 +139,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 18, fontWeight: '800' },
+  brandRow: { flexDirection: 'row', alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '800', marginLeft: 8 },
   body: { flex: 1 },
   tabbar: {
     flexDirection: 'row',

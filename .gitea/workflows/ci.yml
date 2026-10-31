@@ -31,6 +31,10 @@ jobs:
             sleep 10
           done
 
+      - name: Brand asset drift check
+        working-directory: apps/mobile
+        run: npm run assets:check
+
       - name: Unit tests
         working-directory: apps/mobile
         run: npx vitest run
