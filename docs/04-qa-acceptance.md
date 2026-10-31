@@ -12,7 +12,7 @@ Column key: 🟢 = automated evidence complete · 🟡 = automated part passes, 
 | 4 | Provider toggle writes provider.ignore, reads back; UI rollback on failure | pass | pending | 🟡 | routing write/read-back/rollback verified on the serialized preset body; live OpenRouter read-back needs a device |
 | 5 | Key edit/revoke works and reflects on dashboard immediately | pass | pending | 🟡 | list/patch/delete/create wire contracts + reveal invariant verified; dashboard reflection needs a management key on a device |
 | 6 | No credential leaves the device except TLS to openrouter.ai | pass | n/a | 🟢 | transport header/body audit + persisted-field audit; also covered by tests/secrets-guard.test.ts in CI |
-| 7 | Builds via Expo, installs on Android 12+ without crash | pass | pending | 🟡 | production APK built 2026-10-07 (sha256 0048671c…); sideload + crash-free soak remain device-only |
+| 7 | Builds via Expo, installs on Android 12+ without crash | pass | pending | 🟡 | source-only v0.2.0 tag: manifests (package/app/eas), versionCode 3, and CHANGELOG agree; APK build + sideload + soak remain device-only |
 
 ### Automated sub-checks
 
@@ -65,5 +65,9 @@ Column key: 🟢 = automated evidence complete · 🟡 = automated part passes, 
 
 **7. Builds via Expo, installs on Android 12+ without crash**
 
-- ✅ release version pinned at 0.1.0 — package.json 0.1.0 / APK SHA-256 recorded in docs/04-qa-checklist.md §4
-- ✅ bundle/type gate executed by CI (vitest + tsc + expo export) — documented in checklist §0; not re-run inside this check
+- ✅ package.json and app.json versions agree — 0.2.0 / 0.2.0 / release 0.2.0
+- ✅ release version is semver — 0.2.0
+- ✅ android versionCode is a positive integer and matches the release record — 3 / release 3
+- ✅ EAS production profile builds an internal APK — production/apk/internal
+- ✅ CHANGELOG records the released version — ## [0.2.0]
+- ✅ source-only release records no fabricated APK identity — APK identity pending build

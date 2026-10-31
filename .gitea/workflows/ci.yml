@@ -47,6 +47,10 @@ jobs:
         working-directory: apps/mobile
         run: npm run acceptance:evidence
 
+      - name: Release readiness gate
+        working-directory: apps/mobile
+        run: npm run release:check
+
       - name: Typecheck
         working-directory: apps/mobile
         run: npx tsc --noEmit

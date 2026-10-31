@@ -1,0 +1,80 @@
+{
+  "$comment": "Copy to docs/device-run.json, fill real measurements, then run `npm run evidence:init`. Never commit example=true as evidence.",
+  "example": true,
+  "date": "2026-11-02",
+  "tester": "Sam",
+  "apkBuildId": "e6e1199a-c861-4d6f-b825-44d489276f47",
+  "apkSha256": "0048671caed2ca7cd69dc8ba7d41080c6a8e41864214ca68f1d7186b41f3500b",
+  "version": "0.1.0",
+  "versionCode": 1,
+  "commit": "805ac83",
+  "acceptanceRegenerated": true,
+  "devices": [
+    {
+      "device": "Pixel 7",
+      "androidVersion": 14,
+      "coldMs": 6200,
+      "warmMs": 1400,
+      "selectorMs": 12,
+      "soakHours": 72,
+      "crashFree": true,
+      "notes": "primary test phone"
+    },
+    {
+      "device": "Pixel 4a",
+      "androidVersion": 12,
+      "coldMs": 8400,
+      "warmMs": 1750,
+      "selectorMs": 18,
+      "soakHours": 72,
+      "crashFree": true,
+      "notes": "secondary device"
+    }
+  ],
+  "criteria": [
+    {
+      "id": 1,
+      "evidence": "cold and warm stopwatch values; populated Home screenshot",
+      "deviceA": "cold 6.2 s / warm 1.4 s; screenshot home-pixel7.png",
+      "deviceB": "cold 8.4 s / warm 1.8 s; screenshot home-pixel4a.png"
+    },
+    {
+      "id": 2,
+      "evidence": "per-metric dashboard delta (spend/requests/tokens)",
+      "deviceA": "spend 1.2 % / requests 0 % / tokens 0.8 %",
+      "deviceB": "spend 1.4 % / requests 0 % / tokens 0.9 %"
+    },
+    {
+      "id": 3,
+      "evidence": "mgmt screenshot, standard-key fallback, airplane-mode stale badge",
+      "deviceA": "mgmt+fallback+stale screenshots recorded",
+      "deviceB": "mgmt+fallback+stale screenshots recorded"
+    },
+    {
+      "id": 4,
+      "evidence": "dashboard read-back after toggle; induced-failure rollback note",
+      "deviceA": "ignore contains openai after toggle; rollback reproduced",
+      "deviceB": "read-back verified; rollback reproduced"
+    },
+    {
+      "id": 5,
+      "evidence": "rename/limit/revoke screenshots + dashboard timing",
+      "deviceA": "rename+limit+revoke reflected in < 2 s",
+      "deviceB": "rename+limit+revoke reflected in < 2 s"
+    },
+    {
+      "id": 7,
+      "evidence": "install result + 72 h crash-free soak confirmation",
+      "deviceA": "sideload OK; 72 h no crash",
+      "deviceB": "sideload OK; 72 h no crash"
+    }
+  ],
+  "signOff": {
+    "sideloadA": true,
+    "sideloadB": true,
+    "soakA": true,
+    "soakB": true,
+    "tagPushed": true,
+    "activityCapture": "deferred"
+  }
+}

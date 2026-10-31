@@ -196,17 +196,37 @@
       "automated": true,
       "deviceRequired": true,
       "status": "yellow",
-      "evidence": "production APK built 2026-10-07 (sha256 0048671c…); sideload + crash-free soak remain device-only",
+      "evidence": "source-only v0.2.0 tag: manifests (package/app/eas), versionCode 3, and CHANGELOG agree; APK build + sideload + soak remain device-only",
       "assertions": [
         {
-          "name": "release version pinned at 0.1.0",
+          "name": "package.json and app.json versions agree",
           "ok": true,
-          "detail": "package.json 0.1.0 / APK SHA-256 recorded in docs/04-qa-checklist.md §4"
+          "detail": "0.2.0 / 0.2.0 / release 0.2.0"
         },
         {
-          "name": "bundle/type gate executed by CI (vitest + tsc + expo export)",
+          "name": "release version is semver",
           "ok": true,
-          "detail": "documented in checklist §0; not re-run inside this check"
+          "detail": "0.2.0"
+        },
+        {
+          "name": "android versionCode is a positive integer and matches the release record",
+          "ok": true,
+          "detail": "3 / release 3"
+        },
+        {
+          "name": "EAS production profile builds an internal APK",
+          "ok": true,
+          "detail": "production/apk/internal"
+        },
+        {
+          "name": "CHANGELOG records the released version",
+          "ok": true,
+          "detail": "## [0.2.0]"
+        },
+        {
+          "name": "source-only release records no fabricated APK identity",
+          "ok": true,
+          "detail": "APK identity pending build"
         }
       ]
     }

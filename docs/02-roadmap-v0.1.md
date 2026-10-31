@@ -78,6 +78,14 @@ Sizing: S ≤ 0.5 d · M ≤ 1 d · L ≤ 2 d (dev-days, inclusive of testing).
 
 ## M5 — Hardening, QA, release (4–5 d)
 **Status: DONE 2026-10-06 (code+CI); production APK built 2026-10-07 — device sideload/soak Sam-executed per docs/04-qa-checklist.md.** Security: secrets-guard static scan in CI (no secret logging, raw-key literal allowlist, safe settings writes, network whitelist), onboarding paste-warn, double-confirmed clear-stored-key sign-out, core-dump hygiene. QA: fixture-driven engine E2E over real SQLite (node:sqlite) caught TWO release blockers — `limit` reserved-word schema crash + `undefined` binding on optional /key fields (both fixed, regression-covered). A11y: touch targets ≥ 40 px on tappable segments; empty states audited. Release art: eas.json production profile, CHANGELOG, QA-checklist + device matrix + soak plan; EAS production APK built (build `e6e1199a…`, commit `805ac83`, SHA-256 `0048671c…`) after fixing an over-broad `.gitignore` rule that stripped the app config JSON from the build archive. 108 tests at v0.1.0, CI green. **2026-10-31:** automated slices of M5.4/M5.5 landed — scenario matrix (mgmt/standard/offline/pagination/policy/keys) + §11 acceptance harness (`npm run acceptance`). **M5.4 expansion:** failure-mode fixtures (402 on /key, 429 retry-exhaustion, malformed 2xx envelopes, cyclic cursors, offline restart, failed policy write, rollup pruning); two defects fixed — `getKeyStatus`/`getCredits`/`getPreset`/key-CRUD no longer throw on missing `data`, and provider-scoped `replaceDailyRollups` stops pruned days lingering. **M5.5 gate:** deterministic acceptance report + blocking `npm run acceptance:check` CI drift gate + two-device evidence template. **2026-10-31 a11y/release gates:** WCAG-AA light/dark contrast audit, strict ≥ 44 px touch-target scan (all UI Pressables updated), start-budget harness, machine-readable `04-qa-acceptance.json`, and device-evidence validator. 180 tests, CI green.
+> **2026-10-31 device-independent gates hardened:** acceptance criterion 7 now
+> validates the real manifests + [`release.json`](release.json) (no hardcoded
+> `ok: true`, negative-tested); new `npm run release:check` release-identity gate
+> in both CI backends (caught and fixed duplicate `app.json` keys); new
+> `npm run evidence:init` device-run pipeline validates two devices, start
+> budgets, a ≥ 72 h crash-free soak, and renders the dated evidence file.
+> 222 tests, CI green.
+
 | ID | Task | Sizing | Notes |
 |---|---|---|---|
 | ✅ M5.1 | Security pass: key hygiene, network call whitelist, no logging of secrets; threat notes | M | secrets-guard.test.ts as CI gate; paste-warn; sign-out clears key + settings |

@@ -2,6 +2,35 @@
 
 ![OpenRator v0.2 release banner](assets/release-banner.png)
 
+## [0.2.0] — 2026-10-31 — QA & release gates (source-only)
+
+### Added
+- **M5.5** Acceptance criterion 7 is now a real gate: [`src/qa/acceptance.ts`](../apps/mobile/src/qa/acceptance.ts:409)
+  checks package/app versions, `versionCode`, the EAS production APK profile,
+  the CHANGELOG entry, the APK build id/commit/SHA-256, and the release record.
+  Negative tests prove each mismatch fails closed (the old assertions were
+  hardcoded `ok: true`).
+- **M5.6** Executable release-readiness gate: [`src/qa/release.ts`](../apps/mobile/src/qa/release.ts:1)
+  + `npm run release:check` (CI on GitHub and Gitea) validates
+  [`docs/release.json`](release.json), the manifests, the tag, and rejects
+  duplicate JSON keys.
+- **M5.4** Device-run evidence pipeline: [`src/qa/device-run.ts`](../apps/mobile/src/qa/device-run.ts:1)
+  + `npm run evidence:init` validates two devices, cold/warm/selector budgets,
+  a ≥ 72 h crash-free soak, per-criterion evidence, and release identity, then
+  renders `docs/04-device-evidence-<date>.md`. `docs/device-run.example.json`
+  documents the schema and is rejected as evidence.
+- Device-evidence strict validation now also rejects placeholder run metadata
+  (`Date`, `Tester`, APK identity, commit) and an unconfirmed acceptance-report
+  row.
+- 27 new tests (`release.test.ts`, `device-run.test.ts`) plus criterion-7
+  regression tests; suite now 222 tests, tsc and both CI backends green.
+
+### Fixed
+- `apps/mobile/app.json` had duplicate `splash` and `android.package` keys. The
+  last `package` value (`com.anonymous.openrator`) silently overrode the
+  intended `ai.openrator.app`. Duplicates removed; the new gate catches any
+  recurrence.
+
 ## [Unreleased] — M8 OpenCode Go + Zen integration (v0.2)
 
 ### Added

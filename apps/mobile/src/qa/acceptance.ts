@@ -52,6 +52,33 @@ export interface AcceptanceReport {
   checks: AcceptanceCheck[];
 }
 
+/** Release identity recorded in `docs/release.json`. */
+export interface ReleaseRecordFacts {
+  /** `artifact` = APK identity recorded; `source` = tagged source, build pending. */
+  status?: 'artifact' | 'source';
+  version: string;
+  versionCode: number;
+  buildId?: string;
+  commit?: string;
+  sha256?: string;
+}
+
+/** Build/config facts used by §11 criterion 7 (supplied by the test tree). */
+export interface BuildFacts {
+  /** `version` from apps/mobile/package.json. */
+  packageVersion: string;
+  /** `expo.version` from apps/mobile/app.json. */
+  appVersion: string;
+  /** `expo.android.versionCode` from apps/mobile/app.json. */
+  androidVersionCode: number;
+  /** `build.production` from apps/mobile/eas.json (null when absent). */
+  easProduction: { channel?: string; buildType?: string; distribution?: string } | null;
+  /** Raw docs/CHANGELOG.md contents. */
+  changelog: string;
+  /** Release identity recorded in docs/release.json. */
+  release: ReleaseRecordFacts;
+}
+
 /** Everything the checks need; supplied by the test tree (no secrets in src). */
 export interface AcceptanceFixtures {
   /** ISO day used as "today" by the selectors. */
@@ -64,6 +91,7 @@ export interface AcceptanceFixtures {
   creditsTotal: number;
   creditsUsage: number;
   managementKey: string;
+  build: BuildFacts;
 }
 
 const close = (a: number, b: number, tol = 1e-9): boolean => Math.abs(a - b) <= tol;
@@ -406,19 +434,77 @@ async function checkSecretHygiene(f: AcceptanceFixtures): Promise<AcceptanceChec
   };
 }
 
-function checkBuildInstall(): AcceptanceCheck {
+const SEMVER = /^\d+\.\d+\.\d+$/;
+const HEX64 = /^[0-9a-f]{64}$/;
+const GIT_COMMIT = /^[0-9a-f]{7,40}$/i;
+
+/**
+ * §11 criterion 7 — the device-independent half of the build/release gate.
+ *
+ * These assertions used to be hardcoded `ok: true`, which meant the criterion
+ * could never fail. They now read the real manifests and the recorded release
+ * identity (`docs/release.json`), so a version mismatch, a missing EAS
+ * production profile, a stale changelog entry, or a malformed APK checksum
+ * turns the row 🔴 in CI before anything reaches a device.
+ */
+function checkBuildInstall(f: AcceptanceFixtures): AcceptanceCheck {
   const assertions: AcceptanceCheck['assertions'] = [];
-  // Build identity is pinned in app.json/package.json; install/soak is device-only.
+  const build = f.build;
+  const version = build.release.version;
+
   assertions.push({
-    name: 'release version pinned at 0.1.0',
-    ok: true,
-    detail: 'package.json 0.1.0 / APK SHA-256 recorded in docs/04-qa-checklist.md §4',
+    name: 'package.json and app.json versions agree',
+    ok: build.packageVersion === build.appVersion && build.packageVersion === version,
+    detail: `${build.packageVersion} / ${build.appVersion} / release ${version}`,
   });
   assertions.push({
-    name: 'bundle/type gate executed by CI (vitest + tsc + expo export)',
-    ok: true,
-    detail: 'documented in checklist §0; not re-run inside this check',
+    name: 'release version is semver',
+    ok: SEMVER.test(version),
+    detail: version,
   });
+  assertions.push({
+    name: 'android versionCode is a positive integer and matches the release record',
+    ok:
+      Number.isInteger(build.androidVersionCode) &&
+      build.androidVersionCode > 0 &&
+      build.androidVersionCode === build.release.versionCode,
+    detail: `${build.androidVersionCode} / release ${build.release.versionCode}`,
+  });
+  assertions.push({
+    name: 'EAS production profile builds an internal APK',
+    ok:
+      build.easProduction?.channel === 'production' &&
+      build.easProduction?.buildType === 'apk' &&
+      build.easProduction?.distribution === 'internal',
+    detail: build.easProduction
+      ? `${build.easProduction.channel}/${build.easProduction.buildType}/${build.easProduction.distribution}`
+      : 'production profile missing',
+  });
+  assertions.push({
+    name: 'CHANGELOG records the released version',
+    ok: build.changelog.includes(`## [${version}]`),
+    detail: `## [${version}]`,
+  });
+
+  const sourceOnly = build.release.status === 'source';
+  if (sourceOnly) {
+    assertions.push({
+      name: 'source-only release records no fabricated APK identity',
+      ok: !build.release.buildId && !build.release.commit && !build.release.sha256,
+      detail: 'APK identity pending build',
+    });
+  } else {
+    assertions.push({
+      name: 'APK SHA-256 is 64 lowercase hex characters',
+      ok: HEX64.test(build.release.sha256 ?? ''),
+      detail: (build.release.sha256 ?? '').slice(0, 12),
+    });
+    assertions.push({
+      name: 'APK build id and commit are recorded',
+      ok: Boolean(build.release.buildId) && GIT_COMMIT.test(build.release.commit ?? ''),
+      detail: `${build.release.buildId || 'missing'} / ${build.release.commit || 'missing'}`,
+    });
+  }
 
   return {
     row: {
@@ -426,8 +512,9 @@ function checkBuildInstall(): AcceptanceCheck {
       criterion: 'Builds via Expo, installs on Android 12+ without crash',
       automated: assertions.every((a) => a.ok),
       deviceRequired: true,
-      evidence:
-        'production APK built 2026-10-07 (sha256 0048671c…); sideload + crash-free soak remain device-only',
+      evidence: sourceOnly
+        ? 'source-only v0.2.0 tag: manifests (package/app/eas), versionCode 3, and CHANGELOG agree; APK build + sideload + soak remain device-only'
+        : 'manifests (package/app/eas) + docs/release.json agree with the CHANGELOG; sideload + crash-free soak remain device-only',
     },
     assertions,
   };
@@ -449,7 +536,7 @@ export async function runAcceptanceChecks(
     checkPolicyToggle(),
     await checkKeyCrud(fixtures),
     await checkSecretHygiene(fixtures),
-    checkBuildInstall(),
+    checkBuildInstall(fixtures),
   ];
   return { generatedFor: 'spec §11 / M5.5', checks };
 }

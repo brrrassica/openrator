@@ -8,6 +8,16 @@ const DOCS = new URL('../../../docs/', import.meta.url);
 const TEMPLATE = readFileSync(new URL('04-device-evidence-template.md', DOCS), 'utf8');
 
 const COMPLETED = `# evidence
+| Field | Value |
+|---|---|
+| Date | 2026-11-02 |
+| Tester | Sam |
+| APK build id | \`e6e1199a-c861-4d6f-b825-44d489276f47\` |
+| APK SHA-256 | \`0048671caed2ca7cd69dc8ba7d41080c6a8e41864214ca68f1d7186b41f3500b\` |
+| App version / versionCode | \`0.1.0\` / \`1\` |
+| Commit | \`805ac83\` |
+| Acceptance report regenerated (\`npm run acceptance\`) | [x] yes |
+
 | # | Criterion | Evidence | Device A | Device B |
 |---|---|---|---|---|
 | 1 | cold | stopwatch | 6.2 s | 7.1 s |

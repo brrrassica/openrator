@@ -5,6 +5,7 @@
 
 import { AcceptanceFixtures } from '../src/qa/acceptance';
 import { ActivityRow, Provider } from '../src/core/types';
+import { BUILD_FACTS } from './helpers/manifests';
 
 const ACTIVITY: ActivityRow[] = [
   {
@@ -75,4 +76,5 @@ export const ACCEPTANCE_FIXTURES: AcceptanceFixtures = {
   creditsTotal: 65,
   creditsUsage: 48.54,
   managementKey: 'sk-or-v1-acceptance-fixture-0123456789',
+  build: BUILD_FACTS,
 };

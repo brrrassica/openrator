@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it, afterAll } from 'vitest';
 import {
   AcceptanceReport,
+  BuildFacts,
   renderAcceptanceJson,
   renderAcceptanceMarkdown,
   runAcceptanceChecks,
@@ -81,6 +82,72 @@ describe('§11 acceptance checks are all executable', () => {
       expect(row.automated).toBe(true);
     });
   }
+});
+
+describe('§11 criterion 7 fails closed (M5.5 regression guard)', () => {
+  async function criterionSeven(overrides: Partial<BuildFacts>) {
+    const fresh = await runAcceptanceChecks({
+      ...ACCEPTANCE_FIXTURES,
+      build: { ...ACCEPTANCE_FIXTURES.build, ...overrides },
+    });
+    const check = fresh.checks.find((c) => c.row.id === 7);
+    if (!check) throw new Error('criterion 7 missing');
+    return check;
+  }
+
+  it('passes on the real manifests', async () => {
+    const check = await criterionSeven({});
+    expect(check.row.automated).toBe(true);
+  });
+
+  it('fails when app.json and release.json versions drift', async () => {
+    const check = await criterionSeven({ appVersion: '9.9.9' });
+    expect(check.row.automated).toBe(false);
+    expect(check.assertions.find((a) => a.name.includes('versions agree'))?.ok).toBe(false);
+  });
+
+  it('fails when the versionCode does not match the release record', async () => {
+    const check = await criterionSeven({ androidVersionCode: 99 });
+    expect(check.row.automated).toBe(false);
+  });
+
+  it('fails when the EAS production profile is missing', async () => {
+    const check = await criterionSeven({ easProduction: null });
+    expect(check.row.automated).toBe(false);
+    expect(check.assertions.find((a) => a.name.includes('EAS production'))?.ok).toBe(false);
+  });
+
+  it('fails when the changelog has no entry for the release', async () => {
+    const check = await criterionSeven({ changelog: '# no releases here' });
+    expect(check.row.automated).toBe(false);
+  });
+
+  it('fails when an artifact release has a malformed checksum', async () => {
+    const check = await criterionSeven({
+      release: { ...ACCEPTANCE_FIXTURES.build.release, status: 'artifact', sha256: 'not-a-sha' },
+    });
+    expect(check.row.automated).toBe(false);
+  });
+
+  it('fails when an artifact release has no APK commit', async () => {
+    const check = await criterionSeven({
+      release: { ...ACCEPTANCE_FIXTURES.build.release, status: 'artifact', commit: '' },
+    });
+    expect(check.row.automated).toBe(false);
+  });
+
+  it('fails when a source release fabricates an APK identity', async () => {
+    const check = await criterionSeven({
+      release: {
+        ...ACCEPTANCE_FIXTURES.build.release,
+        status: 'source',
+        buildId: 'abc',
+        commit: '805ac83',
+        sha256: '0048671caed2ca7cd69dc8ba7d41080c6a8e41864214ca68f1d7186b41f3500b',
+      },
+    });
+    expect(check.row.automated).toBe(false);
+  });
 });
 
 describe('acceptance status mapping', () => {

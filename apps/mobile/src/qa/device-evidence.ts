@@ -31,10 +31,21 @@ const SIGN_OFF_ROWS = [
   'Sideload on Device B',
   '72 h crash-free soak (A)',
   '72 h crash-free soak (B)',
-  'Tag `v0.1.0` pushed to Gitea',
 ];
 
+/** Run metadata that must be real (not `____`) in a completed copy. */
+const METADATA_ROWS = [
+  'Date',
+  'Tester',
+  'APK build id',
+  'APK SHA-256',
+  'App version / versionCode',
+  'Commit',
+];
+
+const TAG_ROW = /^\|\s*Tag `v[^`]+` pushed to Gitea\s*\|/;
 const PLACEHOLDER = /_{2,}/;
+const filled = (value: string): boolean => value.trim().length > 0 && !PLACEHOLDER.test(value);
 
 function parseTableRow(line: string): string[] {
   return line
@@ -104,6 +115,53 @@ export function validateDeviceEvidence(
       name: row,
       ok,
       detail: ok ? (template ? 'row present' : 'checked') : template ? 'row empty' : 'not checked',
+    });
+  }
+
+  // The tag row carries the release version, so match it structurally.
+  const tagLine = lines.find((l) => TAG_ROW.test(l.trim()));
+  if (!tagLine) {
+    findings.push({ name: 'tag pushed', ok: false, detail: 'sign-off row missing' });
+  } else {
+    const cell = parseTableRow(tagLine).slice(1).join(' ');
+    const ok = template ? cell.length > 0 : /\[x\]/i.test(cell);
+    findings.push({
+      name: 'tag pushed',
+      ok,
+      detail: ok ? (template ? 'row present' : 'checked') : template ? 'row empty' : 'not checked',
+    });
+  }
+
+  // Section 0: run metadata must be filled in a completed copy, and the
+  // acceptance report must have been regenerated before the pass.
+  for (const label of METADATA_ROWS) {
+    const line = lines.find((l) => {
+      const cells = parseTableRow(l);
+      return cells.length >= 2 && cells[0] === label;
+    });
+    if (!line) {
+      findings.push({ name: `metadata ${label}`, ok: false, detail: 'row missing' });
+      continue;
+    }
+    const value = parseTableRow(line)[1] ?? '';
+    const ok = template ? value.length > 0 : filled(value);
+    findings.push({
+      name: `metadata ${label}`,
+      ok,
+      detail: ok ? (template ? 'row present' : 'recorded') : 'missing or still placeholder',
+    });
+  }
+
+  const acceptanceLine = lines.find((l) => l.includes('Acceptance report regenerated'));
+  if (!acceptanceLine) {
+    findings.push({ name: 'metadata acceptance report', ok: false, detail: 'row missing' });
+  } else {
+    const value = parseTableRow(acceptanceLine).slice(1).join(' ');
+    const ok = template ? value.length > 0 : /\[x\]/i.test(value);
+    findings.push({
+      name: 'metadata acceptance report',
+      ok,
+      detail: ok ? (template ? 'row present' : 'regenerated') : 'not confirmed',
     });
   }
 

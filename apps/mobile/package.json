@@ -2,7 +2,7 @@
   "name": "openrator",
   "description": "OpenRator — single-pane OpenRouter dashboard for Android (Expo/React Native).",
   "license": "0BSD",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "index.ts",
   "dependencies": {
     "expo": "~57.0.26",
@@ -35,6 +35,8 @@
     "acceptance": "ACCEPTANCE_REPORT=1 vitest run tests/acceptance.test.ts",
     "acceptance:check": "ACCEPTANCE_VERIFY=1 vitest run tests/acceptance.test.ts",
     "acceptance:evidence": "vitest run tests/device-evidence.test.ts",
+    "evidence:init": "EVIDENCE_RENDER=1 vitest run tests/device-run.test.ts",
+    "release:check": "vitest run tests/release.test.ts",
     "typecheck": "tsc --noEmit",
     "assets:build": "node ../../scripts/brand/build-assets.mjs",
     "assets:check": "node ../../scripts/brand/build-assets.mjs --check"
