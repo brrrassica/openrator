@@ -6,11 +6,7 @@
  */
 
 import { OPENROUTER_BASE_URL, POLL } from './config';
-import {
-  OpenRouterApiError,
-  OpenRouterNetworkError,
-  mapHttpError,
-} from './errors';
+import { FetchLike, HttpClient } from './http';
 import {
   ActivityPage,
   ActivityRecord,
@@ -24,14 +20,6 @@ import {
   PresetVersion,
   Provider,
 } from './types';
-
-interface FetchLike {
-  (input: string, init?: Record<string, unknown>): Promise<{
-    status: number;
-    headers: { get(name: string): string | null };
-    json(): Promise<unknown>;
-  }>;
-}
 
 interface ClientOptions {
   apiKey: string;
@@ -59,15 +47,6 @@ function pickList(raw: unknown): Record<string, unknown>[] {
   if (!raw || typeof raw !== 'object') return [];
   const data = (raw as { data?: unknown }).data;
   return Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
-}
-
-/** True for DOM/RN AbortError raised when a request is aborted. */
-function isAbortError(e: unknown): boolean {
-  return (
-    typeof e === 'object' &&
-    e !== null &&
-    (e as { name?: unknown }).name === 'AbortError'
-  );
 }
 
 /** Picks snake_case keys from `src` into a camelCase object. */
@@ -98,86 +77,25 @@ export function testRawKey(
 }
 
 export class OpenRouterClient {
-  private readonly baseUrl: string;
-  private readonly timeoutMs: number;
-  private readonly fetchFn: FetchLike;
-  private readonly maxRetries: number;
-  private queue: Promise<unknown> = Promise.resolve();
+  private readonly http: HttpClient;
 
   constructor(private readonly opts: ClientOptions) {
-    this.baseUrl = (opts.baseUrl ?? OPENROUTER_BASE_URL).replace(/\/+$/, '');
-    this.timeoutMs = opts.timeoutMs ?? POLL.REQUEST_TIMEOUT_MS;
-    this.fetchFn = opts.fetchFn ?? (async (url, init) => fetch(url, init) as ReturnType<FetchLike>);
-    this.maxRetries = opts.maxRetries ?? POLL.MAX_RETRIES;
+    this.http = new HttpClient({
+      apiKey: opts.apiKey,
+      baseUrl: opts.baseUrl ?? OPENROUTER_BASE_URL,
+      timeoutMs: opts.timeoutMs ?? POLL.REQUEST_TIMEOUT_MS,
+      fetchFn: opts.fetchFn,
+      maxRetries: opts.maxRetries ?? POLL.MAX_RETRIES,
+    });
   }
 
   /** Serialise all requests: one in-flight OpenRouter call at a time. */
   private singleFlight<T>(fn: () => Promise<T>): Promise<T> {
-    const run = this.queue.then(fn, fn);
-    // keep the chain alive regardless of individual failures
-    this.queue = run.catch(() => undefined);
-    return run;
+    return this.http.singleFlight(fn);
   }
 
-  private async request<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<T> {
-    const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
-    let lastErr: Error | undefined;
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
-      if (attempt > 0) {
-        const backoffMs = Math.min(500 * 2 ** (attempt - 1), 4000) + Math.floor(Math.random() * 150);
-        await new Promise((r) => setTimeout(r, backoffMs));
-      }
-      const controller = new AbortController();
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      // Reject even if the underlying fetch ignores the abort signal.
-      const timeout = new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => {
-          controller.abort();
-          reject(new OpenRouterNetworkError('request timed out'));
-        }, this.timeoutMs);
-      });
-      try {
-        const res = await Promise.race([
-          this.fetchFn(url, {
-            method,
-            headers: {
-              Authorization: `Bearer ${this.opts.apiKey}`,
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-            body: body === undefined ? undefined : JSON.stringify(body),
-            signal: controller.signal,
-          }),
-          timeout,
-        ]);
-        let json: unknown;
-        try {
-          json = await res.json();
-        } catch {
-          json = undefined;
-        }
-        if (res.status >= 200 && res.status < 300) {
-          return json as T;
-        }
-        const err = mapHttpError(res.status, json, res.headers.get('Retry-After'));
-        if (!err.retriable) throw err;
-        lastErr = err;
-      } catch (e) {
-        if (e instanceof OpenRouterApiError) throw e;
-        if (isAbortError(e)) {
-          lastErr = new OpenRouterNetworkError('request aborted');
-        } else {
-          lastErr = e instanceof Error ? e : new Error(String(e));
-        }
-      } finally {
-        if (timer) clearTimeout(timer);
-      }
-    }
-    throw lastErr ?? new OpenRouterNetworkError('request failed');
+  private request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    return this.http.request<T>(method, path, body);
   }
 
   // ---- typed endpoints -------------------------------------------------

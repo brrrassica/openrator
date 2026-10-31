@@ -41,6 +41,8 @@ export interface Credits {
 
 /** GET /api/v1/providers → data[] */
 export interface Provider {
+  /** Local provider dimension (M7). Defaults to openrouter for v0.1 rows. */
+  provider?: string;
   name: string;
   slug: string;
   privacyPolicyUrl: string | null;
@@ -140,6 +142,8 @@ export interface ActivityPage {
 
 /** Row shape stored in SQLite (normalized, camelCase on read). */
 export interface ActivityRow {
+  /** Provider dimension (M7); omitted means openrouter in legacy callers. */
+  provider?: string;
   day: string; // YYYY-MM-DD
   endpoint: string;
   apiKeyHash: string;
@@ -149,6 +153,8 @@ export interface ActivityRow {
 }
 
 export interface DailyRollup {
+  /** Provider dimension (M7); omitted means openrouter in legacy callers. */
+  provider?: string;
   day: string;
   spendUsd: number;
   requests: number;
@@ -164,6 +170,8 @@ export interface Setting {
 
 /** Current-key card row. */
 export interface KeyRow {
+  /** Provider dimension (M7); omitted means openrouter in legacy callers. */
+  provider?: string;
   hash: string;
   label: string;
   isManagement: number;

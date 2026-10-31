@@ -7,10 +7,11 @@ import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CredentialService, createSecureKeyValueStore } from './src/core/credentials';
-import { OpenRouterClient } from './src/core/client';
 import { clearAllData, migrate, setSetting } from './src/store/daos';
 import { openDb, SqlDb } from './src/store/db';
 import { SyncEngine } from './src/sync/sync-engine';
+import { createConfiguredAdapters } from './src/providers/factory';
+import { listDescriptors } from './src/providers/registry';
 import OnboardingScreen from './src/ui/onboarding';
 import Shell from './src/ui/shell';
 import { ThemeProvider, useTheme } from './src/ui/theme';
@@ -94,21 +95,20 @@ function Inner() {
       try {
         const store = await createSecureKeyValueStore();
         const creds = new CredentialService(store);
+        // M7.4: one-time move from the v0.1 single-key namespace.
+        await creds.migrateLegacy();
         const db = await openDb();
         await migrate(db);
         if (cancel) return;
         setCtx({ creds, db });
-        const hasKey = await creds.hasKey();
-        if (hasKey) {
-          const key = await creds.getKey();
-          if (key) {
-            const eng = makeEngine(creds, db, key, setNote);
-            setEngine(eng);
-            eng.start(true);
-            void eng.refreshAll();
-            setStage('ready');
-            return;
-          }
+        const providers = await creds.providersWithKeys();
+        if (providers.length > 0) {
+          const eng = await makeEngine(creds, db, setNote);
+          setEngine(eng);
+          eng.start(true);
+          void eng.refreshAll();
+          setStage('ready');
+          return;
         }
         setStage('onboarding');
       } catch (e) {
@@ -153,10 +153,9 @@ function Inner() {
     return (
       <OnboardingScreen
         creds={ctx.creds}
+        providers={listDescriptors()}
         onDone={async () => {
-          const key = await ctx.creds.getKey();
-          if (!key) return;
-          const eng = makeEngine(ctx.creds, ctx.db, key, setNote);
+          const eng = await makeEngine(ctx.creds, ctx.db, setNote);
           setEngine(eng);
           eng.start(true);
           void eng.refreshAll();
@@ -168,10 +167,25 @@ function Inner() {
   }
 
   if (stage === 'ready' && engine && ctx) {
+    const rebuild = async () => {
+      engine.stop();
+      const providers = await ctx.creds.providersWithKeys();
+      if (providers.length === 0) {
+        setEngine(null);
+        setStage('onboarding');
+        return;
+      }
+      const next = await makeEngine(ctx.creds, ctx.db, setNote);
+      setEngine(next);
+      next.start(true);
+      void next.refreshAll();
+    };
     return (
       <Shell
         engine={engine}
         db={ctx.db}
+        creds={ctx.creds}
+        onAccountsChanged={() => void rebuild()}
         onSignOut={() => {
           engine.stop();
           void (async () => {
@@ -190,14 +204,13 @@ function Inner() {
   return null;
 }
 
-function makeEngine(
+async function makeEngine(
   creds: CredentialService,
   db: SqlDb,
-  apiKey: string,
   onError: (note: string) => void,
-): SyncEngine {
-  const client = new OpenRouterClient({ apiKey });
-  return new SyncEngine(client, creds, db, {
+): Promise<SyncEngine> {
+  const adapters = await createConfiguredAdapters(creds);
+  return new SyncEngine(adapters, creds, db, {
     onError: (src, e) => onError(`${src}: ${e.message}`),
   });
 }

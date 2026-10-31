@@ -1,37 +1,47 @@
 /**
- * OpenRator — onboarding (M1.1): paste key, optional label, management-key
- * toggle. Key never logged; format-gated before save; paste-warn note inline.
- * Themed via useTheme() so it renders correctly in dark mode (WS2-4).
+ * OpenRator — onboarding (M1.1, M7.7): choose a provider, paste its key,
+ * optional label, and a management-key toggle where supported. Key never
+ * logged; format-gated before save; paste-warn note inline.
  */
 
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { CredentialService } from '../core/credentials';
+import { listDescriptors, getDescriptor } from '../providers/registry';
+import { ProviderDescriptor, ProviderId } from '../providers/types';
 import { BrandMark } from './brand-mark';
 import { useTheme } from './theme';
 
 interface Props {
   creds: CredentialService;
+  providers?: ProviderDescriptor[];
   onDone: () => void;
   onError?: (message: string) => void;
 }
 
-export default function OnboardingScreen({ creds, onDone, onError }: Props) {
+export default function OnboardingScreen({
+  creds,
+  providers = listDescriptors(),
+  onDone,
+  onError,
+}: Props) {
   const t = useTheme();
+  const [providerId, setProviderId] = useState<ProviderId>(providers[0]?.id ?? 'openrouter');
   const [key, setKey] = useState('');
   const [label, setLabel] = useState('');
   const [isMgmt, setIsMgmt] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const valid = CredentialService.looksLikeKey(key);
+  const provider = getDescriptor(providerId);
+  const valid = provider.keyPattern.test(key.trim());
 
   async function save() {
     if (!valid || busy) return;
     setBusy(true);
     setErr(null);
     try {
-      await creds.saveKey(key, isMgmt);
+      await creds.saveKey(key, provider.supportsManagementKey ? isMgmt : false, providerId);
       onDone();
     } catch (e) {
       // WS2-7: a failed secure-store write must be surfaced; we do NOT advance.
@@ -51,9 +61,40 @@ export default function OnboardingScreen({ creds, onDone, onError }: Props) {
       <Text style={[styles.title, { color: t.text }]}>Welcome to OpenRator</Text>
       <Text style={[styles.tagline, { color: t.subtext }]}>One pane for every AI bill</Text>
       <Text style={[styles.body, { color: t.subtext }]}>
-        Paste your OpenRouter API key (sk-or-v1-…). It is stored only on this
-        device and sent only to openrouter.ai over TLS. OpenRator never logs it.
+        Paste your {provider.displayName} API key. It is stored only on this
+        device and sent only to {provider.id === 'openrouter' ? 'openrouter.ai' : 'the provider'}{' '}
+        over TLS. OpenRator never logs it.
       </Text>
+
+      {providers.length > 1 ? (
+        <>
+          <Text style={[styles.fieldLabel, { color: t.text }]}>Provider</Text>
+          <View style={styles.providerRow}>
+            {providers.map((p) => {
+              const active = p.id === providerId;
+              return (
+                <Pressable
+                  key={p.id}
+                  style={[
+                    styles.providerChip,
+                    { borderColor: active ? t.accent : t.border, backgroundColor: t.card },
+                  ]}
+                  onPress={() => {
+                    setProviderId(p.id);
+                    setIsMgmt(false);
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text style={{ color: active ? t.accent : t.subtext, fontSize: 12 }}>
+                    {p.displayName}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
 
       <View style={[styles.pasteWarn, { borderColor: t.warn, backgroundColor: t.warn + '18' }]}>
         <Text style={[styles.pasteWarnText, { color: t.warn }]}>
@@ -67,7 +108,7 @@ export default function OnboardingScreen({ creds, onDone, onError }: Props) {
         style={[styles.input, { color: t.text, borderColor: t.border, backgroundColor: t.card }]}
         value={key}
         onChangeText={setKey}
-        placeholder="sk-or-v1-…"
+        placeholder={provider.id === 'openrouter' ? 'sk-or-v1-…' : 'provider key'}
         placeholderTextColor={t.subtext}
         secureTextEntry
         autoCapitalize="none"
@@ -87,18 +128,20 @@ export default function OnboardingScreen({ creds, onDone, onError }: Props) {
         testID="onboarding.label"
       />
 
-      <View style={styles.row}>
-        <Switch
-          value={isMgmt}
-          onValueChange={setIsMgmt}
-          trackColor={{ false: t.border, true: t.accent }}
-          thumbColor={t.accentText}
-        />
-        <Text style={[styles.rowText, { color: t.subtext }]}>
-          Also a management key — unlocks 30-day spend analytics, key list and
-          key editing (spec §5.2).
-        </Text>
-      </View>
+      {provider.supportsManagementKey ? (
+        <View style={styles.row}>
+          <Switch
+            value={isMgmt}
+            onValueChange={setIsMgmt}
+            trackColor={{ false: t.border, true: t.accent }}
+            thumbColor={t.accentText}
+          />
+          <Text style={[styles.rowText, { color: t.subtext }]}>
+            Also a management key — unlocks 30-day spend analytics, key list and
+            key editing (spec §5.2).
+          </Text>
+        </View>
+      ) : null}
 
       {err ? <Text style={[styles.error, { color: t.danger }]}>{err}</Text> : null}
 
@@ -115,9 +158,7 @@ export default function OnboardingScreen({ creds, onDone, onError }: Props) {
         </Text>
       </Pressable>
       {!valid && key.length > 0 ? (
-        <Text style={[styles.hint, { color: t.subtext }]}>
-          Keys start with sk-or-v1- and are at least 20 chars.
-        </Text>
+        <Text style={[styles.hint, { color: t.subtext }]}>{provider.keyHint}</Text>
       ) : null}
     </View>
   );
@@ -129,6 +170,15 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', marginBottom: 4 },
   tagline: { fontSize: 13, marginBottom: 14 },
   body: { fontSize: 14, lineHeight: 20, marginBottom: 16 },
+  providerRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4, marginBottom: 8 },
+  providerChip: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    marginRight: 8,
+    marginBottom: 8,
+  },
   pasteWarn: {
     borderStyle: 'dashed',
     borderWidth: 1,

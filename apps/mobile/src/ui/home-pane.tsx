@@ -17,13 +17,17 @@ import {
 import { SqlDb } from '../store/db';
 import {
   getDailyRollups,
-  getKeyRow,
+  getKeyRows,
+  getProviderSetting,
   getSetting,
   listProvidersFromDb,
 } from '../store/daos';
 import { SyncEngine, isStale } from '../sync/sync-engine';
 import { POLL } from '../core/config';
 import { DailyRollup, KeyRow, Provider } from '../core/types';
+import { ProviderId } from '../providers/types';
+import { getDescriptor } from '../providers/registry';
+import { combineKeyRows, sumCredits } from './aggregate';
 import { computeHomeSummary, HomeSummary, problemProviders, resetLabel } from './home-summary';
 import { fmtCount, fmtUsd, limitLabel } from './chart-math';
 import { BarRows, ResponsiveAreaChart } from './primitives';
@@ -32,6 +36,7 @@ import { useTheme } from './theme';
 interface Props {
   engine: SyncEngine;
   db: SqlDb;
+  provider?: 'all' | ProviderId;
 }
 
 interface HomeData {
@@ -43,7 +48,7 @@ interface HomeData {
   creditsUsage: number;
 }
 
-export default function HomePane({ engine, db }: Props) {
+export default function HomePane({ engine, db, provider = 'all' }: Props) {
   const t = useTheme();
   const [data, setData] = useState<HomeData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,25 +56,53 @@ export default function HomePane({ engine, db }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const hash = (await getSetting(db, 'credential.key_hash')) ?? '';
-      const [key, rollups, providers, creditsTotalRaw, creditsUsageRaw] = await Promise.all([
-        hash ? getKeyRow(db, hash) : null,
-        getDailyRollups(db),
-        listProvidersFromDb(db),
-        getSetting(db, 'account.total_credits'),
-        getSetting(db, 'account.total_usage'),
+      const scopeIds = engine.getProviders();
+      const ids: ProviderId[] = provider === 'all' ? scopeIds : [provider];
+      const providerFilter = provider === 'all' ? undefined : provider;
+      const [keyRows, rollups, providers] = await Promise.all([
+        getKeyRows(db, providerFilter),
+        getDailyRollups(db, undefined, undefined, providerFilter),
+        listProvidersFromDb(db, providerFilter),
       ]);
+      const credits = await Promise.all(
+        ids.map(async (id) => {
+          const total = await getProviderSetting(db, id, 'account.total_credits');
+          const usage = await getProviderSetting(db, id, 'account.total_usage');
+          // v0.1 rows only had global settings for OpenRouter.
+          const legacyTotal =
+            id === 'openrouter' && total === null
+              ? await getSetting(db, 'account.total_credits')
+              : total;
+          const legacyUsage =
+            id === 'openrouter' && usage === null
+              ? await getSetting(db, 'account.total_usage')
+              : usage;
+          return {
+            total: Number(legacyTotal ?? 0) || 0,
+            usage: Number(legacyUsage ?? 0) || 0,
+          };
+        }),
+      );
+      const key =
+        provider === 'all'
+          ? combineKeyRows(keyRows, 'All providers')
+          : keyRows[0] ?? null;
       const today = new Date().toISOString().slice(0, 10);
-      const creditsTotal = Number(creditsTotalRaw ?? 0) || 0;
-      const creditsUsage = Number(creditsUsageRaw ?? 0) || 0;
+      const totals = sumCredits(credits);
       if (mounted.current) {
-        setData({ key, rollups, providers, today, creditsTotal, creditsUsage });
+        setData({
+          key,
+          rollups,
+          providers,
+          today,
+          creditsTotal: totals.total,
+          creditsUsage: totals.usage,
+        });
       }
-      // activity locked is derived from the engine's status instead
-    } catch (e) {
+    } catch {
       // keep last-known data; offline is fine
     }
-  }, [db]);
+  }, [db, engine, provider]);
 
   useEffect(() => {
     mounted.current = true;
@@ -98,9 +131,15 @@ export default function HomePane({ engine, db }: Props) {
     );
   }
 
-  const status = engine.getStatus();
-  const staleCredits = isStale(status.credits?.lastOkAt, POLL.CREDITS_FOREGROUND_MS * 2);
-  const activityLocked = status.activity?.error === 'management key required';
+  const scopeIds = provider === 'all' ? engine.getProviders() : [provider];
+  const statuses = scopeIds.map((id) => engine.getStatus(id));
+  const staleCredits = statuses.some((s) =>
+    isStale(s.credits?.lastOkAt, POLL.CREDITS_FOREGROUND_MS * 2),
+  );
+  const activityLocked =
+    scopeIds.length > 0 &&
+    statuses.every((s) => s.activity?.error === 'management key required');
+  const scopeName = provider === 'all' ? 'All providers' : getDescriptor(provider).displayName;
   const summary: HomeSummary = computeHomeSummary({
     key: data.key,
     rollups: data.rollups,
@@ -128,10 +167,10 @@ export default function HomePane({ engine, db }: Props) {
         </View>
       ) : null}
 
-      {/* OpenRouter account credits — the primary figure */}
+      {/* Account credits — the primary figure */}
       <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: t.text }]}>OpenRouter Credits</Text>
+          <Text style={[styles.cardTitle, { color: t.text }]}>{scopeName} Credits</Text>
           <View style={[styles.chip, { backgroundColor: t.border }]}>
             <Text style={{ color: t.subtext, fontSize: 11 }}>account balance</Text>
           </View>

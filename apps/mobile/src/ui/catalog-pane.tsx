@@ -19,14 +19,16 @@ import { listProvidersFromDb } from '../store/daos';
 import { SyncEngine, isStale } from '../sync/sync-engine';
 import { POLL } from '../core/config';
 import { Provider } from '../core/types';
+import { ProviderId } from '../providers/types';
 import { useTheme } from './theme';
 
 interface Props {
   engine: SyncEngine;
   db: SqlDb;
+  provider?: 'all' | ProviderId;
 }
 
-export default function CatalogPane({ engine, db }: Props) {
+export default function CatalogPane({ engine, db, provider = 'all' }: Props) {
   const t = useTheme();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [query, setQuery] = useState('');
@@ -36,12 +38,12 @@ export default function CatalogPane({ engine, db }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const list = await listProvidersFromDb(db);
+      const list = await listProvidersFromDb(db, provider === 'all' ? undefined : provider);
       if (mounted.current) setProviders(list);
     } catch {
       // offline-safe
     }
-  }, [db]);
+  }, [db, provider]);
 
   useEffect(() => {
     mounted.current = true;
@@ -56,12 +58,13 @@ export default function CatalogPane({ engine, db }: Props) {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await engine.refreshProviders();
+      if (provider !== 'all') await engine.refreshProviders(provider);
+      else await engine.refreshAll();
       await load();
     } finally {
       setRefreshing(false);
     }
-  }, [engine, load]);
+  }, [engine, load, provider]);
 
   const q = query.trim().toLowerCase();
   const filtered = providers
@@ -72,7 +75,9 @@ export default function CatalogPane({ engine, db }: Props) {
         : a.name.localeCompare(b.name),
     );
 
-  const stale = isStale(engine.getStatus().providers?.lastOkAt, POLL.SNAPSHOT_DAILY_MS);
+  const stale = (provider === 'all' ? engine.getProviders() : [provider]).some((id) =>
+    isStale(engine.getStatus(id).providers?.lastOkAt, POLL.SNAPSHOT_DAILY_MS),
+  );
 
   return (
     <ScrollView

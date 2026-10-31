@@ -1,24 +1,34 @@
 /**
- * OpenRator — SyncEngine (spec §7): poll schedules, deltas, staleness.
- * Timers are setTimeout-based (works on RN without extra deps); start/stop
- * switch foreground ↔ background cadence per spec.
+ * OpenRator — provider sync engine / orchestrator (M7.6).
+ *
+ * One adapter per configured provider. Each provider refreshes independently:
+ * a failure in one provider or one source never prevents the others from
+ * completing. Timers are setTimeout-based (works on RN without extra deps).
  */
 
 import { ACTIVITY_WINDOW_DAYS, POLL } from '../core/config';
 import { OpenRouterClient } from '../core/client';
 import { CredentialService } from '../core/credentials';
-import { addDays, computeDailyRollups, fmtDay, toActivityRow } from './rollups';
+import { addDays, computeDailyRollups, fmtDay } from './rollups';
 import { SqlDb } from '../store/db';
 import {
   getActivityRows,
   pruneActivityOlderThan,
   replaceDailyRollups,
+  setProviderSetting,
   setSetting,
   upsertActivityRows,
   upsertKeyRow,
   upsertProviderRows,
 } from '../store/daos';
-import { ActivityRow, KeyStatus, Provider } from '../core/types';
+import { ActivityRow, Provider } from '../core/types';
+import {
+  AccountSnapshot,
+  ProviderAdapter,
+  ProviderId,
+  ProviderManagement,
+} from '../providers/types';
+import { fixedOpenRouterAdapter } from '../providers/openrouter/adapter';
 
 export type SourceName = 'credits' | 'activity' | 'providers' | 'models';
 
@@ -28,21 +38,13 @@ export interface SyncStatus {
 
 export interface SyncCallbacks {
   onStatus?: (status: SyncStatus) => void;
-  onKey?: (key: KeyStatus) => void;
+  onKey?: (snapshot: AccountSnapshot) => void;
   onActivity?: (rows: ActivityRow[]) => void;
   onProviders?: (providers: Provider[]) => void;
   onError?: (source: SourceName, err: Error) => void;
 }
 
-const HASH_KEY_SETTING = 'credential.key_hash';
-const HASH_PREFIX_SETTING = 'credential.key_prefix';
-
-/** Non-secret short fingerprint for the current key (never the raw key). */
-const shortHash = (key: string): string => {
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) & 0x7fffffff;
-  return `${key.slice(0, 7)}${h.toString(16)}`;
-};
+type EngineSource = OpenRouterClient | ProviderAdapter | ProviderAdapter[];
 
 interface Timer {
   stop: () => void;
@@ -65,21 +67,75 @@ function every(intervalMs: number, fn: () => void): Timer {
   };
 }
 
+const isAdapter = (value: EngineSource): value is ProviderAdapter =>
+  typeof value === 'object' && value !== null && 'capabilities' in value && 'id' in value;
+
 export class SyncEngine {
-  private status: SyncStatus = {};
+  private readonly adapters = new Map<ProviderId, ProviderAdapter>();
+  private readonly statuses = new Map<ProviderId, SyncStatus>();
   private timers: Timer[] = [];
   private foreground = true;
   private running = false;
   private listeners = new Set<() => void>();
 
   constructor(
-    readonly client: OpenRouterClient,
+    source: EngineSource,
     private readonly creds: CredentialService,
     private readonly db: SqlDb,
     private readonly cb: SyncCallbacks = {},
-  ) {}
+  ) {
+    if (source instanceof OpenRouterClient) {
+      this.adapters.set('openrouter', fixedOpenRouterAdapter(source));
+    } else if (Array.isArray(source)) {
+      for (const adapter of source) this.adapters.set(adapter.id, adapter);
+    } else if (isAdapter(source)) {
+      this.adapters.set(source.id, source);
+    }
+    for (const id of this.adapters.keys()) this.statuses.set(id, {});
+  }
 
-  /** Subscribe to refresh cycles (UI re-reads its data from SQLite). */
+  // ---- provider registry ---------------------------------------------------
+
+  getProviders(): ProviderId[] {
+    return Array.from(this.adapters.keys());
+  }
+
+  hasProvider(provider: ProviderId): boolean {
+    return this.adapters.has(provider);
+  }
+
+  addAdapter(adapter: ProviderAdapter): void {
+    this.adapters.set(adapter.id, adapter);
+    if (!this.statuses.has(adapter.id)) this.statuses.set(adapter.id, {});
+    this.emit();
+  }
+
+  getAdapter(provider: ProviderId): ProviderAdapter | undefined {
+    return this.adapters.get(provider);
+  }
+
+  getCapabilities(provider: ProviderId) {
+    return this.adapters.get(provider)?.capabilities;
+  }
+
+  /**
+   * Backwards-compatible management façade. Only providers that expose
+   * management operations (OpenRouter today) return a usable object.
+   */
+  get management(): ProviderManagement {
+    for (const adapter of this.adapters.values()) {
+      if (adapter.management) return adapter.management;
+    }
+    throw new Error('This provider does not expose management operations');
+  }
+
+  /** @deprecated use `management`; kept so v0.1 panes keep compiling. */
+  get client(): ProviderManagement {
+    return this.management;
+  }
+
+  // ---- subscriptions -------------------------------------------------------
+
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => {
@@ -91,128 +147,227 @@ export class SyncEngine {
     for (const l of this.listeners) l();
   }
 
-  private touch(source: SourceName, err?: string) {
-    const prev = this.status[source];
-    this.status[source] = {
+  private statusFor(provider: ProviderId): SyncStatus {
+    let status = this.statuses.get(provider);
+    if (!status) {
+      status = {};
+      this.statuses.set(provider, status);
+    }
+    return status;
+  }
+
+  private touch(provider: ProviderId, source: SourceName, err?: string) {
+    const status = this.statusFor(provider);
+    const prev = status[source];
+    status[source] = {
       lastOkAt: err ? prev?.lastOkAt : Date.now(),
       error: err,
       stalenessMs: err ? (prev?.lastOkAt ? Date.now() - prev.lastOkAt : Infinity) : 0,
     };
-    this.cb.onStatus?.({ ...this.status });
+    this.cb.onStatus?.({ ...status });
     this.emit();
   }
 
   // ---- refreshers ---------------------------------------------------------
 
-  /** /key + /credits (balance) → keys row + settings. */
-  async refreshCredits(): Promise<KeyStatus> {
+  private requireAdapter(provider: ProviderId): ProviderAdapter {
+    const adapter = this.adapters.get(provider);
+    if (!adapter) throw new Error(`Provider ${provider} is not configured`);
+    return adapter;
+  }
+
+  private async credential(provider: ProviderId) {
+    return this.creds.getCredential(provider);
+  }
+
+  /** Account + key windows + balance → keys row + settings. */
+  async refreshCredits(provider: ProviderId = 'openrouter'): Promise<AccountSnapshot> {
+    const adapter = this.requireAdapter(provider);
     try {
-      const key = await this.client.getKeyStatus();
-      const raw = (await this.creds.getKey()) ?? '';
+      const credential = await this.credential(provider);
+      if (!credential) throw new Error('No credential saved for this provider');
+      const snapshot = await adapter.getAccount(credential);
+
       await upsertKeyRow(this.db, {
-        hash: shortHash(raw),
-        label: key.label,
-        isManagement: key.isManagementKey ? 1 : 0,
-        limit: key.limit,
-        limitRemaining: key.limitRemaining,
-        limitReset: key.limitReset,
-        usageMonthly: key.usageMonthly,
-        usageDaily: key.usageDaily,
-        usageWeekly: key.usageWeekly,
-        expiresAt: key.expiresAt,
-        updatedAt: new Date().toISOString(),
+        provider,
+        hash: snapshot.fingerprint,
+        label: snapshot.label,
+        isManagement: snapshot.isManagement ? 1 : 0,
+        limit: snapshot.limit,
+        limitRemaining: snapshot.limitRemaining,
+        limitReset: snapshot.limitReset,
+        usageMonthly: snapshot.usageMonthly,
+        usageDaily: snapshot.usageDaily,
+        usageWeekly: snapshot.usageWeekly,
+        expiresAt: snapshot.expiresAt,
+        updatedAt: snapshot.updatedAt,
       });
-      await setSetting(this.db, HASH_KEY_SETTING, shortHash(raw));
-      await setSetting(this.db, HASH_PREFIX_SETTING, raw.slice(0, 9));
-      // account balance is a benefit (verified 200 on standard keys);
-      // degrade silently if OpenRouter ever restricts it (403).
-      try {
-        const credits = await this.client.getCredits();
-        await setSetting(this.db, 'account.total_credits', String(credits.totalCredits));
-        await setSetting(this.db, 'account.total_usage', String(credits.totalUsage));
-      } catch {
-        // balanced card simply hides the account row (spec §5.1 note)
+
+      if (snapshot.balanceTotal !== undefined) {
+        await setProviderSetting(
+          this.db,
+          provider,
+          'account.total_credits',
+          String(snapshot.balanceTotal),
+        );
+        await setProviderSetting(
+          this.db,
+          provider,
+          'account.total_usage',
+          String(snapshot.balanceUsage ?? 0),
+        );
       }
-      this.touch('credits');
-      this.cb.onKey?.(key);
-      return key;
+      await setProviderSetting(this.db, provider, 'credential.key_hash', snapshot.fingerprint);
+      await setProviderSetting(this.db, provider, 'account.label', snapshot.label);
+
+      // Preserve v0.1 global settings for the primary provider and legacy UI.
+      if (provider === 'openrouter') {
+        await setSetting(this.db, 'credential.key_hash', snapshot.fingerprint);
+        await setSetting(this.db, 'credential.key_prefix', snapshot.fingerprint.slice(0, 9));
+        if (snapshot.balanceTotal !== undefined) {
+          await setSetting(this.db, 'account.total_credits', String(snapshot.balanceTotal));
+          await setSetting(this.db, 'account.total_usage', String(snapshot.balanceUsage ?? 0));
+        }
+      }
+
+      this.touch(provider, 'credits');
+      this.cb.onKey?.(snapshot);
+      return snapshot;
     } catch (e) {
-      this.touch('credits', String(e instanceof Error ? e.message : e));
+      this.touch(provider, 'credits', String(e instanceof Error ? e.message : e));
       this.cb.onError?.('credits', e instanceof Error ? e : new Error(String(e)));
       throw e;
     }
   }
 
-  /** No-op without a management key (403 otherwise; spec §5.3). */
-  async refreshActivity(): Promise<ActivityRow[] | null> {
-    if (!(await this.creds.isManagementKey())) {
-      this.touch('activity', 'management key required');
+  /** No-op without a management credential or capability (spec §5.3). */
+  async refreshActivity(provider: ProviderId = 'openrouter'): Promise<ActivityRow[] | null> {
+    const adapter = this.requireAdapter(provider);
+    if (!adapter.capabilities.activityHistory || !adapter.getUsage) {
+      this.touch(provider, 'activity', 'not supported');
+      return null;
+    }
+    const credential = await this.credential(provider);
+    if (!credential || (!credential.isManagement && !credential.managementKey)) {
+      this.touch(provider, 'activity', 'management key required');
       return null;
     }
     try {
-      const page = await this.client.getActivityAll();
-      const rows = page.data.map(toActivityRow).filter((r) => r !== null) as ActivityRow[];
+      const today = fmtDay(new Date());
+      const usage = await adapter.getUsage!(credential, {
+        fromDay: addDays(today, -ACTIVITY_WINDOW_DAYS),
+        toDay: today,
+      });
+      const rows: ActivityRow[] = usage.map((u) => ({
+        provider: u.provider,
+        day: u.day,
+        endpoint: u.endpoint,
+        apiKeyHash: u.apiKeyHash,
+        requests: u.requests,
+        spendUsd: u.spendUsd,
+        tokens: u.tokens,
+      }));
       if (rows.length) await upsertActivityRows(this.db, rows);
 
-      const today = fmtDay(new Date());
-      await pruneActivityOlderThan(this.db, addDays(today, -POLL.ACTIVITY_RETENTION_DAYS));
-      const keep = await getActivityRows(this.db, { fromDay: addDays(today, -ACTIVITY_WINDOW_DAYS) });
+      await pruneActivityOlderThan(
+        this.db,
+        addDays(today, -POLL.ACTIVITY_RETENTION_DAYS),
+        provider,
+      );
+      const keep = await getActivityRows(this.db, {
+        provider,
+        fromDay: addDays(today, -ACTIVITY_WINDOW_DAYS),
+      });
       if (keep.length) await replaceDailyRollups(this.db, computeDailyRollups(keep));
 
-      this.touch('activity');
+      this.touch(provider, 'activity');
       const all = await getActivityRows(this.db, {
+        provider,
         fromDay: addDays(today, -ACTIVITY_WINDOW_DAYS),
         limit: 2000,
       });
       this.cb.onActivity?.(all);
       return all;
     } catch (e) {
-      this.touch('activity', String(e instanceof Error ? e.message : e));
+      this.touch(provider, 'activity', String(e instanceof Error ? e.message : e));
       this.cb.onError?.('activity', e instanceof Error ? e : new Error(String(e)));
       throw e;
     }
   }
 
-  async refreshProviders(): Promise<Provider[]> {
+  async refreshProviders(provider: ProviderId = 'openrouter'): Promise<Provider[]> {
+    const adapter = this.requireAdapter(provider);
+    if (!adapter.capabilities.providerCatalog || !adapter.getCatalog) {
+      this.touch(provider, 'providers', 'not supported');
+      return [];
+    }
     try {
-      const providers = await this.client.listProviders();
-      // Batched in one transaction (WS2-2); stamps last_ok_at/state (WS2-9).
-      await upsertProviderRows(this.db, providers);
-      this.touch('providers');
+      const credential = await this.credential(provider);
+      if (!credential) throw new Error('No credential saved for this provider');
+      const entries = await adapter.getCatalog(credential);
+      const providers: Provider[] = entries.map((p) => ({
+        provider,
+        slug: p.slug,
+        name: p.name,
+        datacenters: p.datacenters,
+        statusPageUrl: p.statusPageUrl,
+        privacyPolicyUrl: p.privacyPolicyUrl ?? null,
+        termsOfServiceUrl: p.termsOfServiceUrl ?? null,
+        headquarters: p.headquarters ?? null,
+      }));
+      await upsertProviderRows(this.db, providers, undefined, provider);
+      this.touch(provider, 'providers');
       this.cb.onProviders?.(providers);
       return providers;
     } catch (e) {
-      this.touch('providers', String(e instanceof Error ? e.message : e));
+      this.touch(provider, 'providers', String(e instanceof Error ? e.message : e));
       this.cb.onError?.('providers', e instanceof Error ? e : new Error(String(e)));
       throw e;
     }
   }
 
-  async refreshModels(): Promise<void> {
+  async refreshModels(provider: ProviderId = 'openrouter'): Promise<void> {
+    const adapter = this.requireAdapter(provider);
+    if (!adapter.getModelCount) {
+      this.touch(provider, 'models', 'not supported');
+      return;
+    }
     try {
-      const { models } = await this.client.listModelsUser();
-      await setSetting(this.db, 'models_user_count', String(models.length));
-      await setSetting(this.db, 'models_user_cache_at', String(Date.now()));
-      this.touch('models');
+      const credential = await this.credential(provider);
+      if (!credential) throw new Error('No credential saved for this provider');
+      const count = await adapter.getModelCount(credential);
+      await setProviderSetting(this.db, provider, 'models_user_count', String(count));
+      await setProviderSetting(this.db, provider, 'models_user_cache_at', String(Date.now()));
+      if (provider === 'openrouter') {
+        await setSetting(this.db, 'models_user_count', String(count));
+      }
+      this.touch(provider, 'models');
     } catch (e) {
-      this.touch('models', String(e instanceof Error ? e.message : e));
+      this.touch(provider, 'models', String(e instanceof Error ? e.message : e));
       this.cb.onError?.('models', e instanceof Error ? e : new Error(String(e)));
       throw e;
     }
   }
 
-  /**
-   * One full pass — used at onboarding and on manual refresh. Failure-isolated:
-   * credits runs first, then the remaining sources run independently so one
-   * rejection never skips the rest. Per-source status is surfaced via touch().
-   */
-  async refreshAll(): Promise<void> {
-    await this.refreshCredits().catch(() => undefined);
+  /** One full pass for a single provider, failure-isolated per source. */
+  async refreshProvider(provider: ProviderId): Promise<void> {
+    await this.refreshCredits(provider).catch(() => undefined);
     await Promise.allSettled([
-      this.refreshActivity(),
-      this.refreshProviders(),
-      this.refreshModels(),
+      this.refreshActivity(provider),
+      this.refreshProviders(provider),
+      this.refreshModels(provider),
     ]);
+  }
+
+  /** One full pass across every configured provider. */
+  async refreshAll(provider?: ProviderId): Promise<void> {
+    if (provider) {
+      await this.refreshProvider(provider);
+      return;
+    }
+    await Promise.allSettled(
+      this.getProviders().map((id) => this.refreshProvider(id)),
+    );
   }
 
   // ---- scheduler ----------------------------------------------------------
@@ -242,28 +397,40 @@ export class SyncEngine {
   }
 
   private schedule(): void {
-    const creditsEvery = this.foreground ? POLL.CREDITS_FOREGROUND_MS : POLL.CREDITS_BACKGROUND_MS;
-    this.timers = [
-      every(creditsEvery, () => {
-        void this.refreshCredits().catch(() => undefined);
-      }),
-      every(POLL.ACTIVITY_FOREGROUND_MS, () => {
-        void this.refreshActivity().catch(() => undefined);
-      }),
-      every(POLL.SNAPSHOT_DAILY_MS, () => {
-        void this.refreshProviders().catch(() => undefined);
-        void this.refreshModels().catch(() => undefined);
-      }),
-    ];
+    const creditsEvery = this.foreground
+      ? POLL.CREDITS_FOREGROUND_MS
+      : POLL.CREDITS_BACKGROUND_MS;
+    this.timers = [];
+    for (const provider of this.getProviders()) {
+      this.timers.push(
+        every(creditsEvery, () => {
+          void this.refreshCredits(provider).catch(() => undefined);
+        }),
+        every(POLL.ACTIVITY_FOREGROUND_MS, () => {
+          void this.refreshActivity(provider).catch(() => undefined);
+        }),
+        every(POLL.SNAPSHOT_DAILY_MS, () => {
+          void this.refreshProviders(provider).catch(() => undefined);
+          void this.refreshModels(provider).catch(() => undefined);
+        }),
+      );
+    }
   }
 
   /** Any key value sanity check (create-flow test, M4.5). */
-  isManagementKey(): Promise<boolean> {
-    return this.creds.isManagementKey();
+  isManagementKey(provider: ProviderId = 'openrouter'): Promise<boolean> {
+    return this.creds.isManagementKey(provider);
   }
 
-  getStatus(): SyncStatus {
-    return { ...this.status };
+  /** Status for one provider (defaults to OpenRouter for v0.1 panes). */
+  getStatus(provider: ProviderId = 'openrouter'): SyncStatus {
+    return { ...this.statusFor(provider) };
+  }
+
+  getAllStatus(): Record<string, SyncStatus> {
+    const out: Record<string, SyncStatus> = {};
+    for (const [id, status] of this.statuses) out[id] = { ...status };
+    return out;
   }
 }
 

@@ -19,6 +19,8 @@ export function providerOf(endpoint: string): string {
 
 export interface EndpointStat {
   endpoint: string;
+  /** Provider dimension when rows carry one (M7). */
+  provider?: string;
   providerSlug: string;
   statusPageUrl: string | null;
   requests: number;
@@ -42,19 +44,32 @@ export function aggregateEndpoints(
 ): EndpointStat[] {
   const from = addDays(today, -(windowDays - 1));
   const inWindow = rows.filter((r) => r.day >= from && r.day <= today);
-  const agg = new Map<string, { requests: number; spendUsd: number; tokens: number }>();
+  const agg = new Map<
+    string,
+    { endpoint: string; provider?: string; requests: number; spendUsd: number; tokens: number }
+  >();
   for (const r of inWindow) {
-    const cur = agg.get(r.endpoint) ?? { requests: 0, spendUsd: 0, tokens: 0 };
+    // Keep provider dimensions distinct in aggregate mode; legacy rows without
+    // a provider preserve the v0.1 endpoint-only key.
+    const key = r.provider ? `${r.provider}\u0001${r.endpoint}` : r.endpoint;
+    const cur = agg.get(key) ?? {
+      endpoint: r.endpoint,
+      provider: r.provider,
+      requests: 0,
+      spendUsd: 0,
+      tokens: 0,
+    };
     cur.requests += r.requests;
     cur.spendUsd += r.spendUsd;
     cur.tokens += r.tokens;
-    agg.set(r.endpoint, cur);
+    agg.set(key, cur);
   }
   const total = Array.from(agg.values()).reduce((s, v) => s + v.spendUsd, 0);
   return Array.from(agg.entries())
-    .map(([endpoint, v]) => ({
-      endpoint,
-      providerSlug: providerOf(endpoint),
+    .map(([, v]) => ({
+      endpoint: v.endpoint,
+      provider: v.provider,
+      providerSlug: providerOf(v.endpoint),
       statusPageUrl: null,
       requests: v.requests,
       spendUsd: v.spendUsd,
@@ -87,8 +102,16 @@ export function providerShare(
   const inWindow = rows.filter((r) => r.day >= from && r.day <= today);
   const agg = new Map<string, number>();
   let total = 0;
+  // With several provider dimensions, group by provider id (the aggregate
+  // view). A single-provider scope keeps the v0.1 endpoint-tail breakdown.
+  const distinctProviders = new Set(
+    inWindow.map((r) => r.provider).filter((p): p is string => Boolean(p)),
+  );
+  const byProviderDimension = distinctProviders.size > 1;
   for (const r of inWindow) {
-    const p = providerOf(r.endpoint);
+    const p = byProviderDimension
+      ? r.provider ?? providerOf(r.endpoint)
+      : providerOf(r.endpoint);
     agg.set(p, (agg.get(p) ?? 0) + r.spendUsd);
     total += r.spendUsd;
   }

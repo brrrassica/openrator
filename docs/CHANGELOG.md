@@ -2,6 +2,29 @@
 
 ![OpenRator v0.2 release banner](assets/release-banner.png)
 
+## [Unreleased] — M7 multi-provider core (v0.2)
+
+### Added
+- **M7.1–M7.2** Normalized provider domain model (`AccountSnapshot`,
+  `UsageRecord`, `ProviderCapabilities`, `ProviderAdapter`) and a provider
+  registry with capability-gated OpenRouter/OpenCode Zen descriptors.
+- **M7.3** Shared HTTP core (`core/http.ts`) carrying timeout, single-flight,
+  retry/backoff, and error mapping for every adapter; OpenRouter is the first
+  adapter and existing client tests stay green.
+- **M7.4** Namespaced secure credentials (`provider.<id>.key`, optional
+  `provider.<id>.management_key`) with a one-time migration from the v0.1 key.
+- **M7.5** SQLite migration v4: `provider` is part of the primary key for
+  activity, rollups, keys, and provider snapshots; legacy rows copy as
+  `openrouter`; new `usage_manual` table; provider-scoped settings.
+- **M7.6** Per-provider sync orchestrator with independent failure isolation,
+  capability gating, and per-provider staleness/status.
+- **M7.7** Provider-aware onboarding, an Accounts pane (add/remove/sign out per
+  provider), and adapter factory wiring.
+- **M7.8** Home/Spend "All providers" scope plus a provider switcher;
+  capability-gated Providers/Keys tabs show explainers rather than fake controls.
+- **M7.9** Tests for v3→v4 migration, credential migration/namespacing,
+  orchestrator failure isolation, aggregate math, and OpenRouter/Zen adapters.
+
 ## [Unreleased] — M6 brand system (v0.2)
 
 ### Added

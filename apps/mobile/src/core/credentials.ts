@@ -1,9 +1,14 @@
 /**
- * OpenRator — credential handling (spec §6.2, D2/D7, M0.8).
- * Key lives in expo-secure-store (hardware-backed where available); the
- * management-key flag is cached alongside. The raw key is NEVER logged and
- * never written to SQLite.
+ * OpenRator — credential handling (spec §6.2, D2/D7, M0.8, M7.4).
+ *
+ * Credentials live in expo-secure-store, never SQLite. v0.2 namespaces every
+ * value under `provider.<id>.key` and optionally
+ * `provider.<id>.management_key`. The legacy single OpenRouter key is migrated
+ * exactly once.
  */
+
+import { PROVIDER_IDS, ProviderCredential, ProviderId } from '../providers/types';
+import { getDescriptor } from '../providers/registry';
 
 export interface KeyValueStore {
   get(key: string): Promise<string | null>;
@@ -11,8 +16,12 @@ export interface KeyValueStore {
   delete(key: string): Promise<void>;
 }
 
-const K_OPENROUTER_KEY = 'openrator.openrouter.key';
-const K_OPENROUTER_MGMT = 'openrator.openrouter.is_management';
+const LEGACY_KEY = 'openrator.openrouter.key';
+const LEGACY_MGMT = 'openrator.openrouter.is_management';
+
+const keyName = (provider: ProviderId) => `provider.${provider}.key`;
+const mgmtName = (provider: ProviderId) => `provider.${provider}.management_key`;
+const flagName = (provider: ProviderId) => `provider.${provider}.is_management`;
 
 /** In-memory store — tests only. */
 export class MemoryKeyValueStore implements KeyValueStore {
@@ -69,33 +78,116 @@ export async function createSecureKeyValueStore(): Promise<KeyValueStore> {
 export class CredentialService {
   constructor(private readonly store: KeyValueStore) {}
 
-  async hasKey(): Promise<boolean> {
-    return (await this.store.get(K_OPENROUTER_KEY)) !== null;
+  // ---- legacy migration ----------------------------------------------------
+
+  /**
+   * Copies the v0.1 key to the OpenRouter namespace, then removes the old
+   * records. Idempotent: a second run is a no-op.
+   */
+  async migrateLegacy(): Promise<void> {
+    const legacyKey = await this.store.get(LEGACY_KEY);
+    if (!legacyKey) return;
+    if (!(await this.store.get(keyName('openrouter')))) {
+      await this.store.set(keyName('openrouter'), legacyKey);
+    }
+    if ((await this.store.get(LEGACY_MGMT)) === '1') {
+      await this.store.set(flagName('openrouter'), '1');
+      if (!(await this.store.get(mgmtName('openrouter')))) {
+        await this.store.set(mgmtName('openrouter'), legacyKey);
+      }
+    }
+    await this.store.delete(LEGACY_KEY);
+    await this.store.delete(LEGACY_MGMT);
   }
 
-  async saveKey(key: string, isManagement: boolean): Promise<void> {
+  // ---- primary key ---------------------------------------------------------
+
+  async hasKey(provider: ProviderId = 'openrouter'): Promise<boolean> {
+    return (await this.getKey(provider)) !== null;
+  }
+
+  async saveKey(
+    key: string,
+    isManagement: boolean,
+    provider: ProviderId = 'openrouter',
+  ): Promise<void> {
     const trimmed = key.trim();
     if (!trimmed) throw new Error('Key must not be empty');
-    await this.store.set(K_OPENROUTER_KEY, trimmed);
-    await this.store.set(K_OPENROUTER_MGMT, isManagement ? '1' : '0');
+    await this.store.set(keyName(provider), trimmed);
+    await this.store.set(flagName(provider), isManagement ? '1' : '0');
   }
 
-  async getKey(): Promise<string | null> {
-    return this.store.get(K_OPENROUTER_KEY);
+  async getKey(provider: ProviderId = 'openrouter'): Promise<string | null> {
+    const stored = await this.store.get(keyName(provider));
+    if (stored !== null) return stored;
+    // Defensive read for callers that run before migrateLegacy().
+    if (provider === 'openrouter') return this.store.get(LEGACY_KEY);
+    return null;
   }
 
-  /** Highest-confidence management flag: persisted toggle overrides missing. */
-  async isManagementKey(): Promise<boolean> {
-    return (await this.store.get(K_OPENROUTER_MGMT)) === '1';
+  /** Highest-confidence management flag: management key or persisted toggle. */
+  async isManagementKey(provider: ProviderId = 'openrouter'): Promise<boolean> {
+    if ((await this.getManagementKey(provider)) !== null) return true;
+    if ((await this.store.get(flagName(provider))) === '1') return true;
+    if (provider === 'openrouter') {
+      return (await this.store.get(LEGACY_MGMT)) === '1';
+    }
+    return false;
+  }
+
+  // ---- optional management key (D13) --------------------------------------
+
+  async saveManagementKey(
+    key: string | null,
+    provider: ProviderId = 'openrouter',
+  ): Promise<void> {
+    if (key === null || key.trim() === '') {
+      await this.store.delete(mgmtName(provider));
+      return;
+    }
+    await this.store.set(mgmtName(provider), key.trim());
+  }
+
+  async getManagementKey(provider: ProviderId = 'openrouter'): Promise<string | null> {
+    return this.store.get(mgmtName(provider));
+  }
+
+  // ---- lifecycle -----------------------------------------------------------
+
+  async clearProvider(provider: ProviderId): Promise<void> {
+    await this.store.delete(keyName(provider));
+    await this.store.delete(mgmtName(provider));
+    await this.store.delete(flagName(provider));
   }
 
   async clear(): Promise<void> {
-    await this.store.delete(K_OPENROUTER_KEY);
-    await this.store.delete(K_OPENROUTER_MGMT);
+    for (const provider of PROVIDER_IDS) await this.clearProvider(provider);
+    await this.store.delete(LEGACY_KEY);
+    await this.store.delete(LEGACY_MGMT);
   }
 
-  /** Sanity gate for the key format OpenRouter issues. */
-  static looksLikeKey(input: string): boolean {
-    return /^sk-or-v1-[A-Za-z0-9_-]{20,}$/.test(input.trim());
+  async providersWithKeys(): Promise<ProviderId[]> {
+    const out: ProviderId[] = [];
+    for (const provider of PROVIDER_IDS) {
+      if (await this.hasKey(provider)) out.push(provider);
+    }
+    return out;
+  }
+
+  async getCredential(provider: ProviderId): Promise<ProviderCredential | null> {
+    const key = await this.getKey(provider);
+    if (!key) return null;
+    const managementKey = await this.getManagementKey(provider);
+    return {
+      provider,
+      key,
+      managementKey,
+      isManagement: await this.isManagementKey(provider),
+    };
+  }
+
+  /** Sanity gate for a provider's documented key format. */
+  static looksLikeKey(input: string, provider: ProviderId = 'openrouter'): boolean {
+    return getDescriptor(provider).keyPattern.test(input.trim());
   }
 }

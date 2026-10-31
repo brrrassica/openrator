@@ -24,6 +24,7 @@ const FILES = walk(SRC);
 const ALLOW_RAW_PATTERN = new Set([
   path.join('core', 'credentials.ts'),
   path.join('core', 'client.ts'),
+  path.join('providers', 'registry.ts'), // key-format regex, no secret value
   path.join('ui', 'onboarding.tsx'),
   path.join('ui', 'keys-pane.tsx'), // only the sk-or-v1-… placeholder/doc text
 ]);

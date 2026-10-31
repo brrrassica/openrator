@@ -21,12 +21,14 @@ import { SqlDb } from '../store/db';
 import { getSetting, listProvidersFromDb, setSetting } from '../store/daos';
 import { SyncEngine } from '../sync/sync-engine';
 import { Preset, PresetConfig, Provider } from '../core/types';
+import { ProviderId } from '../providers/types';
 import { nextRule, ruleFor, setRule, withRouting } from './policy-state';
 import { useTheme } from './theme';
 
 interface Props {
   engine: SyncEngine;
   db: SqlDb;
+  provider?: 'all' | ProviderId;
 }
 
 const SELECTED_SETTING = 'preset.slug_selected';
@@ -35,8 +37,9 @@ const DASHBOARD_PRESETS_URL = 'https://openrouter.ai/settings/presets';
 
 const versionOf = (p: Preset | null): number | null => p?.designatedVersion?.version ?? null;
 
-export default function PolicyPane({ engine, db }: Props) {
+export default function PolicyPane({ engine, db, provider = 'openrouter' }: Props) {
   const t = useTheme();
+  const target: ProviderId = provider === 'all' ? 'openrouter' : provider;
   const [presets, setPresets] = useState<Preset[]>([]);
   const [selected, setSelected] = useState<Preset | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -49,16 +52,16 @@ export default function PolicyPane({ engine, db }: Props) {
 
   const loadProviders = useCallback(async () => {
     try {
-      const list = await listProvidersFromDb(db);
+      const list = await listProvidersFromDb(db, target);
       if (mounted.current) setProviders(list);
     } catch {
       // offline-safe
     }
-  }, [db]);
+  }, [db, target]);
 
   const loadPresets = useCallback(async () => {
     try {
-      const list = await engine.client.listPresets();
+      const list = await engine.management.listPresets();
       const saved = await getSetting(db, SELECTED_SETTING);
       const wanted =
         list.find((p) => p.slug === saved) ?? list.find((p) => p.status !== 'archived') ?? null;
@@ -99,14 +102,14 @@ export default function PolicyPane({ engine, db }: Props) {
     setRefreshing(true);
     setError(null);
     try {
-      await engine.refreshProviders();
-      await engine.refreshModels();
+      await engine.refreshProviders(target);
+      await engine.refreshModels(target);
       await loadPresets();
       await loadProviders();
     } finally {
       setRefreshing(false);
     }
-  }, [engine, loadPresets, loadProviders]);
+  }, [engine, loadPresets, loadProviders, target]);
 
   const config: PresetConfig | null = selected?.designatedVersion?.config ?? null;
 
@@ -142,7 +145,7 @@ export default function PolicyPane({ engine, db }: Props) {
                 setNotice(null);
                 setBusy(true);
                 try {
-                  const saved = await engine.client.upsertPreset(
+                  const saved = await engine.management.upsertPreset(
                     selected.slug,
                     withRouting(config, nextRouting),
                   );

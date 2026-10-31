@@ -19,8 +19,9 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SqlDb } from '../store/db';
-import { getKeyRow, getSetting } from '../store/daos';
+import { getKeyRows } from '../store/daos';
 import { SyncEngine } from '../sync/sync-engine';
+import { ProviderId, ProviderManagement } from '../providers/types';
 import { AdminKey, KeyRow } from '../core/types';
 import { fmtUsd } from './chart-math';
 import { initialRevealState, revealReducer } from './keys-flow';
@@ -29,6 +30,7 @@ import { useTheme } from './theme';
 interface Props {
   engine: SyncEngine;
   db: SqlDb;
+  provider?: 'all' | ProviderId;
   onSignOut?: () => void;
 }
 
@@ -53,8 +55,9 @@ function keyDisplayName(ak: AdminKey): string {
   return keyHumanName(ak) || '(unnamed)';
 }
 
-export default function KeysPane({ engine, db, onSignOut }: Props) {
+export default function KeysPane({ engine, db, provider = 'openrouter', onSignOut }: Props) {
   const t = useTheme();
+  const target: ProviderId = provider === 'all' ? 'openrouter' : provider;
   const [key, setKey] = useState<KeyRow | null>(null);
   const [mgmt, setMgmt] = useState<boolean | null>(null);
   const [adminKeys, setAdminKeys] = useState<AdminKey[]>([]);
@@ -66,21 +69,20 @@ export default function KeysPane({ engine, db, onSignOut }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const hash = await getSetting(db, 'credential.key_hash');
-      const k = hash ? await getKeyRow(db, hash) : null;
-      const isMgmt = await engine.isManagementKey();
+      const rows = await getKeyRows(db, target);
+      const isMgmt = await engine.isManagementKey(target);
       if (mounted.current) {
-        setKey(k);
+        setKey(rows[0] ?? null);
         setMgmt(isMgmt);
       }
       if (isMgmt) {
-        const list = await engine.client.listAdminKeys();
+        const list = await engine.management.listKeys();
         if (mounted.current) setAdminKeys(list);
       }
     } catch (e) {
       if (mounted.current) setError(e instanceof Error ? e.message : String(e));
     }
-  }, [engine, db]);
+  }, [engine, db, target]);
 
   useEffect(() => {
     mounted.current = true;
@@ -96,12 +98,12 @@ export default function KeysPane({ engine, db, onSignOut }: Props) {
     setRefreshing(true);
     setError(null);
     try {
-      await engine.refreshCredits();
+      await engine.refreshCredits(target);
       await load();
     } finally {
       setRefreshing(false);
     }
-  }, [engine, load]);
+  }, [engine, load, target]);
 
   return (
     <ScrollView
@@ -154,7 +156,7 @@ export default function KeysPane({ engine, db, onSignOut }: Props) {
                 setCreating(false);
                 await load();
               }}
-              client={engine.client}
+              management={engine.management}
             />
           ) : null}
 
@@ -187,7 +189,7 @@ export default function KeysPane({ engine, db, onSignOut }: Props) {
                 <KeyEditor
                   theme={t}
                   adminKey={ak}
-                  client={engine.client}
+                  management={engine.management}
                   onDone={async () => {
                     setEditingId(null);
                     await load();
@@ -250,12 +252,12 @@ function WindowStat({ label, value, theme: t }: { label: string; value: string; 
 
 function KeyEditor({
   adminKey,
-  client,
+  management,
   theme: t,
   onDone,
 }: {
   adminKey: AdminKey;
-  client: SyncEngine['client'];
+  management: ProviderManagement;
   theme: ReturnType<typeof useTheme>;
   onDone: () => Promise<void>;
 }) {
@@ -270,7 +272,7 @@ function KeyEditor({
     setSaving(true);
     setErr(null);
     try {
-      await client.patchAdminKey(adminKey.hash, {
+      await management.patchKey(adminKey.hash, {
         label: label.trim() || undefined,
         limit: limit.trim() ? Number(limit) : undefined,
         limitReset: reset || undefined,
@@ -293,8 +295,8 @@ function KeyEditor({
           text: 'Revoke',
           style: 'destructive',
           onPress: () => {
-            client
-              .deleteAdminKey(adminKey.hash)
+            management
+              .deleteKey(adminKey.hash)
               .then(onDone)
               .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
           },
@@ -359,11 +361,11 @@ function KeyEditor({
 // ---- create flow (reveal-later, M4.5) -------------------------------------
 
 function CreateKeyForm({
-  client,
+  management,
   theme: t,
   onDone,
 }: {
-  client: SyncEngine['client'];
+  management: ProviderManagement;
   theme: ReturnType<typeof useTheme>;
   onDone: () => Promise<void>;
 }) {
@@ -379,7 +381,7 @@ function CreateKeyForm({
     setErr(null);
     setTestResult(null);
     try {
-      const created = await client.createAdminKey({
+      const created = await management.createKey({
         label: label.trim() || undefined,
         limit: limit.trim() ? Number(limit) : undefined,
       });
@@ -395,9 +397,7 @@ function CreateKeyForm({
     if (!reveal.keyValue) return;
     setTestResult('testing…');
     try {
-      const keyStatus = await import('../core/client').then((m) =>
-        m.testRawKey(reveal.keyValue as string),
-      );
+      const keyStatus = await management.testRawKey(reveal.keyValue as string);
       setTestResult(
         `✓ works — ${keyStatus.label}${keyStatus.isManagementKey ? ' (management)' : ''}`,
       );

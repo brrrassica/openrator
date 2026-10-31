@@ -16,16 +16,13 @@ import {
   View,
 } from 'react-native';
 import { SqlDb } from '../store/db';
-import {
-  getActivityRows,
-  getKeyRow,
-  getSetting,
-  listProvidersFromDb,
-} from '../store/daos';
+import { getActivityRows, getKeyRows, listProvidersFromDb } from '../store/daos';
 import { SyncEngine, isStale } from '../sync/sync-engine';
 import { POLL } from '../core/config';
 import { addDays } from '../sync/rollups';
 import { ActivityRow, KeyRow, Provider } from '../core/types';
+import { ProviderId } from '../providers/types';
+import { combineKeyRows } from './aggregate';
 import { computeSpendSummary } from './spend-summary';
 import { fmtCount, fmtUsd } from './chart-math';
 import { BarRows, Donut, ResponsiveAreaChart } from './primitives';
@@ -34,11 +31,12 @@ import { useTheme } from './theme';
 interface Props {
   engine: SyncEngine;
   db: SqlDb;
+  provider?: 'all' | ProviderId;
 }
 
 const PERIODS = [7, 14, 30];
 
-export default function SpendPane({ engine, db }: Props) {
+export default function SpendPane({ engine, db, provider = 'all' }: Props) {
   const t = useTheme();
   const [rows, setRows] = useState<ActivityRow[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -53,12 +51,16 @@ export default function SpendPane({ engine, db }: Props) {
     try {
       const today = new Date().toISOString().slice(0, 10);
       const from = addDays(today, -34); // 35-day retention guard
-      const [act, prov, hash] = await Promise.all([
-        getActivityRows(db, { fromDay: from }),
-        listProvidersFromDb(db),
-        getSetting(db, 'credential.key_hash'),
+      const providerFilter = provider === 'all' ? undefined : provider;
+      const [act, prov, keys] = await Promise.all([
+        getActivityRows(db, { fromDay: from, provider: providerFilter }),
+        listProvidersFromDb(db, providerFilter),
+        getKeyRows(db, providerFilter),
       ]);
-      const k = hash ? await getKeyRow(db, hash) : null;
+      const k =
+        provider === 'all'
+          ? combineKeyRows(keys, 'All providers')
+          : keys[0] ?? null;
       if (mounted.current) {
         setRows(act);
         setProviders(prov);
@@ -67,7 +69,7 @@ export default function SpendPane({ engine, db }: Props) {
     } catch {
       // offline-safe: keep last-known
     }
-  }, [db]);
+  }, [db, provider]);
 
   useEffect(() => {
     mounted.current = true;
@@ -88,10 +90,15 @@ export default function SpendPane({ engine, db }: Props) {
     }
   }, [engine]);
 
-  const status = engine.getStatus();
-  const activityLocked = status.activity?.error === 'management key required';
+  const scopeIds = provider === 'all' ? engine.getProviders() : [provider];
+  const statuses = scopeIds.map((id) => engine.getStatus(id));
+  const activityLocked =
+    scopeIds.length > 0 &&
+    statuses.every((s) => s.activity?.error === 'management key required');
   const summary = computeSpendSummary(rows, providers, new Date().toISOString().slice(0, 10), period);
-  const staleActivity = isStale(status.activity?.lastOkAt, POLL.ACTIVITY_FOREGROUND_MS * 2);
+  const staleActivity = statuses.some((s) =>
+    isStale(s.activity?.lastOkAt, POLL.ACTIVITY_FOREGROUND_MS * 2),
+  );
 
   return (
     <ScrollView
