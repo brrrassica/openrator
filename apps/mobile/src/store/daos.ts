@@ -445,10 +445,22 @@ export async function pruneActivityOlderThan(
 
 // ---- daily rollups -------------------------------------------------------
 
-/** Replaces rollups atomically (WS2-2). */
-export async function replaceDailyRollups(db: SqlDb, rollups: DailyRollup[]): Promise<void> {
-  if (rollups.length === 0) return;
+/**
+ * Replaces the rollup set atomically (WS2-2). When `provider` is passed the
+ * provider's existing rows are deleted first, so days pruned out of
+ * `endpoint_activity` never linger in `daily_rollups` (M5.4). An empty
+ * `rollups` array therefore clears that provider's rollups.
+ */
+export async function replaceDailyRollups(
+  db: SqlDb,
+  rollups: DailyRollup[],
+  provider?: string,
+): Promise<void> {
+  if (rollups.length === 0 && !provider) return;
   await withTransaction(db, async () => {
+    if (provider) {
+      await db.runAsync('DELETE FROM daily_rollups WHERE provider = ?', provider);
+    }
     for (const r of rollups) {
       await db.runAsync(
         `INSERT OR REPLACE INTO daily_rollups

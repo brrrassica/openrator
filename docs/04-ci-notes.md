@@ -53,8 +53,11 @@ git config core.hooksPath   # .githooks → versioned post-commit hook
    its SVG master in memory and fails if a committed asset differs; see
    [`06-brand-guide.md`](06-brand-guide.md))
 5. `npx vitest run`
-6. `npx tsc --noEmit`
-7. `npx expo export --platform android --output-dir dist-ci`
+6. `npm run acceptance:check` — §11 acceptance-report drift gate (fails if
+   [`04-qa-acceptance.md`](04-qa-acceptance.md) is stale; regenerate with
+   `npm run acceptance` from `apps/mobile`)
+7. `npx tsc --noEmit`
+8. `npx expo export --platform android --output-dir dist-ci`
 
 ## Runner quirks (learned the hard way)
 
@@ -81,8 +84,8 @@ git config core.hooksPath   # .githooks → versioned post-commit hook
 
 ## GitHub Actions (cloud CI)
 
-- Workflow: `.github/workflows/ci.yml` — same four checks as Gitea
-  (brand asset drift → vitest → `tsc --noEmit` → `expo export --platform android`),
+- Workflow: `.github/workflows/ci.yml` — same checks as Gitea
+  (brand asset drift → vitest → acceptance drift → `tsc --noEmit` → `expo export --platform android`),
   plus the Android bundle uploaded as a `android-bundle` artifact (7-day retention).
 - Triggers: `push` to `main`/`m*`/`dev*` and every `pull_request`.
 - Dependency caching is left to `actions/setup-node` here — the 3× retry loop

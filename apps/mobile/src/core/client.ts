@@ -43,6 +43,17 @@ function mapAs<T>(src: Record<string, unknown>): T {
   return mapObject(src) as unknown as T;
 }
 
+/**
+ * A 2xx response is not a promise that `data` is present (edge proxies and
+ * partial outages return `{}`). Normalize anything that is not a plain object
+ * to `{}` so typed getters never throw on a malformed success body (M5.4).
+ */
+function asRecord(raw: unknown): Record<string, unknown> {
+  return raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? (raw as Record<string, unknown>)
+    : {};
+}
+
 function pickList(raw: unknown): Record<string, unknown>[] {
   if (!raw || typeof raw !== 'object') return [];
   const data = (raw as { data?: unknown }).data;
@@ -51,7 +62,7 @@ function pickList(raw: unknown): Record<string, unknown>[] {
 
 /** Picks snake_case keys from `src` into a camelCase object. */
 export function mapKeyStatus(src: Record<string, unknown>): KeyStatus {
-  const k = mapObject(src);
+  const k = mapObject(asRecord(src));
   const f = (k.freeModelDailyRequests ?? {}) as Record<string, unknown>;
   return {
     ...(k as unknown as KeyStatus),
@@ -102,15 +113,19 @@ export class OpenRouterClient {
 
   getKeyStatus(): Promise<KeyStatus> {
     return this.singleFlight(() =>
-      this.request<{ data: Record<string, unknown> }>('GET', '/key').then((r) => mapKeyStatus(r.data)),
+      this.request<{ data?: unknown }>('GET', '/key').then((r) => mapKeyStatus(asRecord(r?.data))),
     );
   }
 
   getCredits(): Promise<Credits> {
     return this.singleFlight(() =>
-      this.request<{ data: Record<string, unknown> }>('GET', '/credits').then((r) =>
-        mapAs<Credits>(r.data),
-      ),
+      this.request<{ data?: unknown }>('GET', '/credits').then((r) => {
+        const src = mapAs<Credits>(asRecord(r?.data));
+        return {
+          totalCredits: Number(src.totalCredits ?? 0),
+          totalUsage: Number(src.totalUsage ?? 0),
+        };
+      }),
     );
   }
 
@@ -202,8 +217,8 @@ export class OpenRouterClient {
 
   getPreset(slug: string): Promise<Preset> {
     return this.singleFlight(() =>
-      this.request<{ data: Record<string, unknown> }>('GET', `/presets/${encodeURIComponent(slug)}`).then(
-        (r) => mapAs<Preset>(r.data),
+      this.request<{ data?: unknown }>('GET', `/presets/${encodeURIComponent(slug)}`).then((r) =>
+        mapAs<Preset>(asRecord(r?.data)),
       ),
     );
   }
@@ -261,8 +276,8 @@ export class OpenRouterClient {
     if (body.includeByokInLimit !== undefined) wire.include_byok_in_limit = body.includeByokInLimit;
     if (body.expiresAt !== undefined) wire.expires_at = body.expiresAt;
     return this.singleFlight(() =>
-      this.request<{ data: Record<string, unknown> }>('POST', '/keys', wire).then((r) =>
-        mapAs<AdminKeyCreated>(r.data),
+      this.request<{ data?: unknown }>('POST', '/keys', wire).then((r) =>
+        mapAs<AdminKeyCreated>(asRecord(r?.data)),
       ),
     );
   }
@@ -288,11 +303,11 @@ export class OpenRouterClient {
     if (body.includeByokInLimit !== undefined) wire.include_byok_in_limit = body.includeByokInLimit;
     if (body.expiresAt !== undefined) wire.expires_at = body.expiresAt;
     return this.singleFlight(() =>
-      this.request<{ data: Record<string, unknown> }>(
+      this.request<{ data?: unknown }>(
         'PATCH',
         `/keys/${encodeURIComponent(hash)}`,
         wire,
-      ).then((r) => mapAs<AdminKey>(r.data)),
+      ).then((r) => mapAs<AdminKey>(asRecord(r?.data))),
     );
   }
 

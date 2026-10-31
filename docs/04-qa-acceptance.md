@@ -22,7 +22,7 @@ Column key: 🟢 = automated evidence complete · 🟡 = automated part passes, 
 - ✅ today spend derived from rollups — 0.75
 - ✅ credits remaining = total - usage — 16.46
 - ✅ providers available for health strip
-- ✅ selector path under 100 ms (device stopwatch still needed) — 1.48 ms
+- ✅ selector path under 100 ms (device stopwatch still needed) — within budget
 
 **2. Spend trend + top models/providers match dashboard (≤5 % variance)**
 

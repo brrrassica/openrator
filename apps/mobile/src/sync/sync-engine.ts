@@ -278,7 +278,8 @@ export class SyncEngine {
         provider,
         fromDay: addDays(today, -ACTIVITY_WINDOW_DAYS),
       });
-      if (keep.length) await replaceDailyRollups(this.db, computeDailyRollups(keep));
+      // Provider-scoped replace drops rollups for days pruned out of activity.
+      await replaceDailyRollups(this.db, computeDailyRollups(keep), provider);
 
       this.touch(provider, 'activity');
       const all = await getActivityRows(this.db, {

@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it, afterAll } from 'vitest';
 import {
   AcceptanceReport,
@@ -15,12 +15,23 @@ import { ACCEPTANCE_FIXTURES } from './acceptance-fixtures';
  * docs/04-qa-acceptance.md from the same checks asserted here.
  */
 const report: AcceptanceReport = await runAcceptanceChecks(ACCEPTANCE_FIXTURES);
+const REPORT_PATH = new URL('../../../docs/04-qa-acceptance.md', import.meta.url);
 
 afterAll(() => {
   if (process.env.ACCEPTANCE_REPORT === '1') {
-    const out = new URL('../../../docs/04-qa-acceptance.md', import.meta.url);
-    writeFileSync(out, renderAcceptanceMarkdown(report), 'utf8');
+    writeFileSync(REPORT_PATH, renderAcceptanceMarkdown(report), 'utf8');
   }
+});
+
+describe('committed acceptance report is fresh (M5.5 CI gate)', () => {
+  it('matches a fresh run when ACCEPTANCE_VERIFY=1', () => {
+    if (process.env.ACCEPTANCE_VERIFY !== '1') return;
+    const committed = readFileSync(REPORT_PATH, 'utf8');
+    expect(
+      committed,
+      'docs/04-qa-acceptance.md is stale — run `npm run acceptance` and commit the result',
+    ).toBe(renderAcceptanceMarkdown(report));
+  });
 });
 
 describe('§11 acceptance checks are all executable', () => {

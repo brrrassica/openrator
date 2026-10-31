@@ -74,6 +74,14 @@ interface ServerState {
   offline: boolean;
   paginated: boolean;
   presetRouting: PresetRouting;
+  /** Force an HTTP status for /key (e.g. 402). */
+  keyStatus?: number;
+  /** Force an HTTP status for /activity (e.g. 429/500). */
+  activityStatus?: number;
+  /** Force the preset write to fail (500). */
+  presetWriteFails?: boolean;
+  /** Override the /activity payload with malformed fixtures. */
+  activityPayload?: unknown[];
 }
 
 interface Server {
@@ -104,6 +112,21 @@ function makeServer(initial: Partial<ServerState> = {}): Server {
     const path = url.pathname;
 
     if (path.endsWith('/key')) {
+      if (state.keyStatus) {
+        return jsonRes(
+          {
+            error: {
+              message: 'Insufficient credits',
+              code: state.keyStatus,
+              metadata: {
+                limit_source: 'openrouter_credits',
+                remedy_hint: 'Add credits to your account',
+              },
+            },
+          },
+          state.keyStatus,
+        );
+      }
       return jsonRes({
         data: {
           label: state.persona === 'mgmt' ? 'mgmt-fixture' : 'standard-fixture',
@@ -164,6 +187,18 @@ function makeServer(initial: Partial<ServerState> = {}): Server {
           403,
         );
       }
+      if (state.activityStatus) {
+        return jsonRes(
+          { error: { message: 'Rate limited', code: state.activityStatus } },
+          state.activityStatus,
+        );
+      }
+      if (state.activityPayload) {
+        return jsonRes({
+          data: state.activityPayload,
+          total_count: state.activityPayload.length,
+        });
+      }
       if (state.paginated) {
         const cursor = url.searchParams.get('cursor');
         if (cursor === 'page2') {
@@ -196,6 +231,9 @@ function makeServer(initial: Partial<ServerState> = {}): Server {
     }
 
     if (path.includes('/presets/')) {
+      if (state.presetWriteFails) {
+        return jsonRes({ error: { message: 'preset write failed', code: 500 } }, 500);
+      }
       const body = JSON.parse(String(init?.body ?? '{}')) as PresetConfig;
       state.presetRouting = body.provider ?? {};
       return jsonRes({ data: { slug: 'p1', id: 'p1', name: 'Prod', status: 'active', ...body } });
@@ -231,7 +269,11 @@ function makeServer(initial: Partial<ServerState> = {}): Server {
   return { state, log, fetchFn };
 }
 
-async function setup(server: Server, persona: Persona = server.state.persona) {
+async function setup(
+  server: Server,
+  persona: Persona = server.state.persona,
+  opts: { maxRetries?: number } = {},
+) {
   const db = new NodeSqlite();
   await migrate(db);
   const creds = new CredentialService(new MemoryKeyValueStore());
@@ -239,7 +281,7 @@ async function setup(server: Server, persona: Persona = server.state.persona) {
   const client = new OpenRouterClient({
     apiKey: persona === 'mgmt' ? MGMT_KEY : STANDARD_KEY,
     baseUrl: 'https://openrouter.ai/api/v1',
-    maxRetries: 0,
+    maxRetries: opts.maxRetries ?? 0,
     fetchFn: server.fetchFn,
   });
   const errors: Array<{ source: string; message: string }> = [];
@@ -447,5 +489,120 @@ describe('scenario matrix — offline and pagination', () => {
     expect(await getDailyRollups(db)).toHaveLength(0);
     expect(await listProvidersFromDb(db)).toHaveLength(0);
     expect(await getSetting(db, 'credential.key_hash')).not.toBeNull();
+  });
+});
+
+describe('scenario matrix — failure modes and malformed payloads', () => {
+  it('402 on /key is failure-isolated and keeps the cached key card', async () => {
+    const server = makeServer({ persona: 'mgmt' });
+    const { db, engine } = await setup(server);
+    await engine.refreshAll();
+
+    const hash = (await getSetting(db, 'credential.key_hash')) ?? '';
+    const beforeKey = await getKeyRow(db, hash);
+    const beforeCredits = await getSetting(db, 'account.total_credits');
+    const beforeUsage = await getSetting(db, 'account.total_usage');
+
+    server.state.keyStatus = 402;
+    await expect(engine.refreshAll()).resolves.toBeUndefined();
+
+    expect(engine.getStatus().credits.error).toMatch(/Insufficient credits/);
+    expect(await getKeyRow(db, hash)).toEqual(beforeKey);
+    expect(await getSetting(db, 'account.total_credits')).toBe(beforeCredits);
+    expect(await getSetting(db, 'account.total_usage')).toBe(beforeUsage);
+    // the other sources still refreshed
+    expect(await getActivityRows(db)).toHaveLength(3);
+    expect(engine.getStatus().activity.error).toBeUndefined();
+  });
+
+  it('429 on /activity surfaces after retries and leaves the cache intact', async () => {
+    const server = makeServer({ persona: 'mgmt' });
+    const { db, engine, errors } = await setup(server, 'mgmt', { maxRetries: 1 });
+    await engine.refreshActivity();
+    expect(await getActivityRows(db)).toHaveLength(3);
+
+    server.state.activityStatus = 429;
+    await expect(engine.refreshActivity()).rejects.toMatchObject({ status: 429 });
+
+    expect(await getActivityRows(db)).toHaveLength(3);
+    expect(engine.getStatus().activity.error).toMatch(/Rate limited/);
+    expect(engine.getStatus().activity.lastOkAt).toBeTypeOf('number');
+    expect(errors.at(-1)?.source).toBe('activity');
+  });
+
+  it('malformed /activity records are skipped or sanitized, never persisted as NaN', async () => {
+    const server = makeServer({ persona: 'mgmt' });
+    server.state.activityPayload = [
+      { date: 'not-a-day', endpoint: 'bad', requests: 1, spend_usd: 1, tokens: 1 },
+      { date: TODAY, endpoint: '', requests: '3', spend_usd: '0.5', tokens: '10' },
+      { date: TODAY, endpoint: 'good:openai', requests: -5, spend_usd: -1, tokens: -100 },
+      { date: YESTERDAY, endpoint: 'good:openai', spend_usd: 1 },
+    ];
+    const { db, engine } = await setup(server);
+
+    await engine.refreshActivity();
+    const rows = await getActivityRows(db);
+    expect(rows).toHaveLength(3);
+    expect(rows.some((r) => r.day === 'not-a-day')).toBe(false);
+
+    const unknown = rows.find((r) => r.endpoint === 'unknown');
+    expect(unknown).toMatchObject({ day: TODAY, requests: 3, spendUsd: 0.5, tokens: 10 });
+
+    const clamped = rows.find(
+      (r) => r.day === TODAY && r.endpoint === 'good:openai',
+    );
+    expect(clamped).toMatchObject({ requests: 0, spendUsd: 0, tokens: 0 });
+
+    expect(rows.every((r) => Number.isFinite(r.spendUsd) && Number.isFinite(r.tokens))).toBe(true);
+  });
+
+  it('an offline restart reuses the on-device cache from the same SQLite database', async () => {
+    const server = makeServer({ persona: 'mgmt' });
+    const { db, client, creds, engine } = await setup(server);
+    await engine.refreshAll();
+
+    server.state.offline = true;
+    const restartErrors: string[] = [];
+    const restarted = new SyncEngine(client, creds, db, {
+      onError: (source) => restartErrors.push(source),
+    });
+    await expect(restarted.refreshAll()).resolves.toBeUndefined();
+
+    // cache survived the process restart
+    expect(await getActivityRows(db)).toHaveLength(3);
+    expect(await getDailyRollups(db)).toHaveLength(2);
+    expect(restarted.getStatus().credits.error).toMatch(/Network request failed/);
+    expect(restartErrors.sort()).toEqual(['activity', 'credits', 'models', 'providers']);
+  });
+
+  it('failed preset write does not change the server routing truth', async () => {
+    const server = makeServer({ persona: 'mgmt' });
+    const { client } = await setup(server);
+
+    const preset = (await client.listPresets())[0];
+    server.state.presetWriteFails = true;
+    await expect(
+      client.upsertPreset(preset.slug, {
+        ...(preset.designatedVersion?.config ?? {}),
+        provider: { ignore: ['anthropic'] },
+      }),
+    ).rejects.toThrow(/preset write failed/);
+
+    const reread = (await client.listPresets())[0];
+    expect(ruleFor(reread.designatedVersion?.config.provider, 'anthropic')).toBe('default');
+  });
+
+  it('refreshActivity drops rollups for days pruned out of the activity window', async () => {
+    const server = makeServer({ persona: 'mgmt' });
+    const { db, engine } = await setup(server);
+    await db.runAsync(
+      `INSERT INTO daily_rollups (provider, day, spend_usd, requests, tokens, by_endpoint)
+       VALUES ('openrouter', '2020-01-01', 9, 9, 9, '{}')`,
+    );
+
+    await engine.refreshActivity();
+    const days = (await getDailyRollups(db)).map((r) => r.day);
+    expect(days).not.toContain('2020-01-01');
+    expect(days.sort()).toEqual([DAYS.yesterday, DAYS.today].sort());
   });
 });

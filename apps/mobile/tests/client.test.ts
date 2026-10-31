@@ -245,6 +245,27 @@ describe('OpenRouterClient', () => {
     expect(calls()).toHaveLength(3);
   });
 
+  it('tolerates a 2xx response with a missing data envelope (M5.4)', async () => {
+    const { client } = makeClient(async () => res(200, {}));
+    const key = await client.getKeyStatus();
+    expect(key.freeModelDailyRequests).toEqual({ used: 0, limit: 0, remaining: 0 });
+    await expect(client.getCredits()).resolves.toEqual({ totalCredits: 0, totalUsage: 0 });
+    await expect(client.getPreset('p1')).resolves.toEqual({});
+    await expect(client.listAdminKeys()).resolves.toEqual([]);
+  });
+
+  it('stops paginating when links.next cycles (bounded at 50 pages)', async () => {
+    const { client, calls } = makeClient(async () =>
+      res(200, {
+        data: [{ date: '2026-10-04', endpoint: 'a' }],
+        links: { next: 'loop' },
+      }),
+    );
+    const page = await client.getActivityAll();
+    expect(page.data).toHaveLength(50);
+    expect(calls()).toHaveLength(50);
+  });
+
   it('serializes concurrent calls (single-flight per key)', async () => {
     let maxConcurrent = 0;
     let concurrent = 0;

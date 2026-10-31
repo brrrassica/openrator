@@ -106,7 +106,8 @@ function checkHome(f: AcceptanceFixtures): AcceptanceCheck {
   assertions.push({
     name: 'selector path under 100 ms (device stopwatch still needed)',
     ok: elapsedMs < 100,
-    detail: `${elapsedMs.toFixed(2)} ms`,
+    // Deterministic detail so the committed report can be drift-checked in CI.
+    detail: elapsedMs < 100 ? 'within budget' : 'over budget',
   });
 
   return {
