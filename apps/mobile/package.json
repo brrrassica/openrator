@@ -32,6 +32,7 @@
     "web": "expo start --web",
     "test": "vitest run",
     "test:watch": "vitest",
+    "acceptance": "ACCEPTANCE_REPORT=1 vitest run tests/acceptance.test.ts",
     "typecheck": "tsc --noEmit",
     "assets:build": "node ../../scripts/brand/build-assets.mjs",
     "assets:check": "node ../../scripts/brand/build-assets.mjs --check"

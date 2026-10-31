@@ -7,9 +7,11 @@ Grounding: spec §11 acceptance criteria. Column key: 🟢 = verified in this ru
 
 ## 0. Pre-flight (repo state)
 
-- [x] CI green on `main` (Gitea Actions: vitest 108, tsc, `expo export --platform android`)
+- [x] CI green on `main` (Gitea Actions: vitest 135, tsc, `expo export --platform android`)
 - [x] Secrets guard passes (`tests/secrets-guard.test.ts` — no key in logs/db/URLs)
 - [x] Engine E2E over real SQLite passes (`tests/integration-engine.test.ts`)
+- [x] Scenario matrix over real SQLite (mgmt vs standard persona, offline cache retention, pagination) — `tests/scenario-matrix.test.ts`, 7 tests
+- [x] Automated §11 acceptance harness — `npm run acceptance` asserts every device-independent check and regenerates [`04-qa-acceptance.md`](04-qa-acceptance.md), 11 tests
 - [x] `node:sqlite`-caught blocker fixed: `limit` is a reserved word — schema + `upsertKeyRow` now quote it (this would have crashed first device launch)
 - [x] EAS production build green — APK `0.1.0` (build `e6e1199a-c861-4d6f-b825-44d489276f47`, commit `805ac83`); SHA-256 `0048671c…` (§4)
 - [x] EAS archive blocker fixed: root `.gitignore` had `apps/mobile/*.json`, which stripped `package.json`/`app.json`/`eas.json` from the build archive (`PRE_INSTALL_HOOK` → "package.json does not exist"); rule removed
@@ -25,6 +27,14 @@ Grounding: spec §11 acceptance criteria. Column key: 🟢 = verified in this ru
 | 5 | Key edit/revoke works, reflects on dashboard immediately | 🟡 device (mgmt key) | Keys tab → rename/limit → check openrouter.ai/settings/keys | PATCH/DELETE shapes per docs; 401 verified on standard key only — mgmt pass pending |
 | 6 | No credential leaves device except TLS to `openrouter.ai` | 🟢 guard + code review | network whitelist scan + code audit | secrets guard in CI; raw key only in secure store + memory |
 | 7 | Builds via Expo, installs on Android 12+ without crash | 🟢 APK built / 🟡 sideload | EAS build → APK → sideload | production APK built 2026-10-07 (§4); install/soak still device-gated |
+
+### 1a. Automated acceptance report (M5.5)
+
+Run `cd apps/mobile && npm run acceptance`. It executes the device-independent
+§11 checks and regenerates [`04-qa-acceptance.md`](04-qa-acceptance.md)
+(currently: 1 🟢 criterion + 6 🟡 device-gated criteria — **all automated
+portions pass**). Use that report during the device pass; a 🔴 row is a
+regression, while a 🟡 row only means the device/account artifact is pending.
 
 ## 2. Device matrix (two devices minimum)
 
