@@ -371,6 +371,9 @@ const styles = StyleSheet.create({
   segment: {
     borderWidth: 1,
     borderRadius: 8,
+    // ≥ 44 px touch target (M5.4 / WCAG 2.5.5)
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 5,
     marginRight: 6,
@@ -382,6 +385,7 @@ const styles = StyleSheet.create({
   endpointRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 44,
     paddingVertical: 7,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#8888',

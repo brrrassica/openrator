@@ -1,0 +1,214 @@
+{
+  "generatedFor": "spec §11 / M5.5",
+  "summary": {
+    "total": 7,
+    "green": 1,
+    "yellow": 6,
+    "red": 0,
+    "automatedFailures": 0
+  },
+  "checks": [
+    {
+      "id": 1,
+      "criterion": "Fresh install → key → Home populated < 10 s (warm < 2 s)",
+      "automated": true,
+      "deviceRequired": true,
+      "status": "yellow",
+      "evidence": "onboarding+refreshAll path builds a populated Home summary from cached rollups; cold-start stopwatch is device-only",
+      "assertions": [
+        {
+          "name": "14-day trend rendered",
+          "ok": true
+        },
+        {
+          "name": "today spend derived from rollups",
+          "ok": true,
+          "detail": "0.75"
+        },
+        {
+          "name": "credits remaining = total - usage",
+          "ok": true,
+          "detail": "16.46"
+        },
+        {
+          "name": "providers available for health strip",
+          "ok": true
+        },
+        {
+          "name": "selector path under 100 ms (device stopwatch still needed)",
+          "ok": true,
+          "detail": "within budget"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "criterion": "Spend trend + top models/providers match dashboard (≤5 % variance)",
+      "automated": true,
+      "deviceRequired": true,
+      "status": "yellow",
+      "evidence": "selector math reproduced against a recorded activity fixture; live dashboard comparison needs a management key",
+      "assertions": [
+        {
+          "name": "has activity",
+          "ok": true
+        },
+        {
+          "name": "total spend within 5 % of reference",
+          "ok": true,
+          "detail": "4.25 vs 4.25"
+        },
+        {
+          "name": "total requests match reference",
+          "ok": true,
+          "detail": "20"
+        },
+        {
+          "name": "total tokens match reference",
+          "ok": true,
+          "detail": "15100"
+        },
+        {
+          "name": "endpoint aggregates ranked by spend",
+          "ok": true
+        },
+        {
+          "name": "provider share sums to 100 %",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "criterion": "Spend & endpoint analytics match 30-day activity (mgmt); fallback + explainer without; offline stale",
+      "automated": true,
+      "deviceRequired": true,
+      "status": "yellow",
+      "evidence": "mgmt/fallback/stale branches verified in-process; airplane-mode render and live parity need a device",
+      "assertions": [
+        {
+          "name": "mgmt key renders analytics",
+          "ok": true
+        },
+        {
+          "name": "no-mgmt fallback renders explainer state",
+          "ok": true
+        },
+        {
+          "name": "fallback totals are zero, not NaN",
+          "ok": true
+        },
+        {
+          "name": "stale badge propagated offline",
+          "ok": true
+        },
+        {
+          "name": "cached trend survives offline/stale state",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "criterion": "Provider toggle writes provider.ignore, reads back; UI rollback on failure",
+      "automated": true,
+      "deviceRequired": true,
+      "status": "yellow",
+      "evidence": "routing write/read-back/rollback verified on the serialized preset body; live OpenRouter read-back needs a device",
+      "assertions": [
+        {
+          "name": "toggle writes provider.ignore",
+          "ok": true
+        },
+        {
+          "name": "read-back reports ignored",
+          "ok": true
+        },
+        {
+          "name": "included moves slug out of ignore into only",
+          "ok": true
+        },
+        {
+          "name": "rollback restores default rule",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "criterion": "Key edit/revoke works and reflects on dashboard immediately",
+      "automated": true,
+      "deviceRequired": true,
+      "status": "yellow",
+      "evidence": "list/patch/delete/create wire contracts + reveal invariant verified; dashboard reflection needs a management key on a device",
+      "assertions": [
+        {
+          "name": "list keys maps hash/label",
+          "ok": true
+        },
+        {
+          "name": "rename/limit travels as documented snake_case body",
+          "ok": true
+        },
+        {
+          "name": "revoke uses DELETE /keys/{hash}",
+          "ok": true
+        },
+        {
+          "name": "create returns one-time secret",
+          "ok": true
+        },
+        {
+          "name": "revealed state holds secret",
+          "ok": true
+        },
+        {
+          "name": "collapse never retains secret",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "criterion": "No credential leaves the device except TLS to openrouter.ai",
+      "automated": true,
+      "deviceRequired": false,
+      "status": "green",
+      "evidence": "transport header/body audit + persisted-field audit; also covered by tests/secrets-guard.test.ts in CI",
+      "assertions": [
+        {
+          "name": "raw key appears only in the Authorization header",
+          "ok": true
+        },
+        {
+          "name": "no URL/body carries the raw key",
+          "ok": true
+        },
+        {
+          "name": "persisted settings contain no raw key",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "criterion": "Builds via Expo, installs on Android 12+ without crash",
+      "automated": true,
+      "deviceRequired": true,
+      "status": "yellow",
+      "evidence": "production APK built 2026-10-07 (sha256 0048671c…); sideload + crash-free soak remain device-only",
+      "assertions": [
+        {
+          "name": "release version pinned at 0.1.0",
+          "ok": true,
+          "detail": "package.json 0.1.0 / APK SHA-256 recorded in docs/04-qa-checklist.md §4"
+        },
+        {
+          "name": "bundle/type gate executed by CI (vitest + tsc + expo export)",
+          "ok": true,
+          "detail": "documented in checklist §0; not re-run inside this check"
+        }
+      ]
+    }
+  ]
+}

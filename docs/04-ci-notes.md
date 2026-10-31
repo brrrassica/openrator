@@ -52,12 +52,17 @@ git config core.hooksPath   # .githooks → versioned post-commit hook
 4. `npm run assets:check` — brand asset drift gate (regenerates every PNG from
    its SVG master in memory and fails if a committed asset differs; see
    [`06-brand-guide.md`](06-brand-guide.md))
-5. `npx vitest run`
+5. `npx vitest run` — includes the a11y gate (`tests/a11y-audit.test.ts`) and
+   start-budget harness (`tests/start-budget.test.ts`)
 6. `npm run acceptance:check` — §11 acceptance-report drift gate (fails if
-   [`04-qa-acceptance.md`](04-qa-acceptance.md) is stale; regenerate with
+   [`04-qa-acceptance.md`](04-qa-acceptance.md) or
+   [`04-qa-acceptance.json`](04-qa-acceptance.json) is stale; regenerate with
    `npm run acceptance` from `apps/mobile`)
-7. `npx tsc --noEmit`
-8. `npx expo export --platform android --output-dir dist-ci`
+7. `npm run acceptance:evidence` — validates the device-evidence template and
+   any completed `docs/04-device-evidence-*.md` (fails on `____` cells or
+   unchecked sign-off boxes)
+8. `npx tsc --noEmit`
+9. `npx expo export --platform android --output-dir dist-ci`
 
 ## Runner quirks (learned the hard way)
 
@@ -85,8 +90,9 @@ git config core.hooksPath   # .githooks → versioned post-commit hook
 ## GitHub Actions (cloud CI)
 
 - Workflow: `.github/workflows/ci.yml` — same checks as Gitea
-  (brand asset drift → vitest → acceptance drift → `tsc --noEmit` → `expo export --platform android`),
-  plus the Android bundle uploaded as a `android-bundle` artifact (7-day retention).
+  (brand asset drift → vitest → acceptance drift → device-evidence validator →
+  `tsc --noEmit` → `expo export --platform android`), plus the Android bundle
+  uploaded as a `android-bundle` artifact (7-day retention).
 - Triggers: `push` to `main`/`m*`/`dev*` and every `pull_request`.
 - Dependency caching is left to `actions/setup-node` here — the 3× retry loop
   in the Gitea workflow exists only for the flaky LAN egress (see quirks).

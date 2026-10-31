@@ -175,6 +175,9 @@ const styles = StyleSheet.create({
   providerChip: {
     borderWidth: 1,
     borderRadius: 10,
+    // ≥ 44 px touch target (M5.4 / WCAG 2.5.5)
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 14,
     paddingVertical: 9,
     marginRight: 8,
@@ -202,6 +205,8 @@ const styles = StyleSheet.create({
   hint: { fontSize: 12, marginTop: 4 },
   button: {
     borderRadius: 10,
+    minHeight: 44,
+    justifyContent: 'center',
     paddingVertical: 12,
     marginTop: 16,
   },

@@ -2,9 +2,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it, afterAll } from 'vitest';
 import {
   AcceptanceReport,
+  renderAcceptanceJson,
   renderAcceptanceMarkdown,
   runAcceptanceChecks,
   statusOf,
+  summarizeAcceptance,
 } from '../src/qa/acceptance';
 import { ACCEPTANCE_FIXTURES } from './acceptance-fixtures';
 
@@ -16,10 +18,12 @@ import { ACCEPTANCE_FIXTURES } from './acceptance-fixtures';
  */
 const report: AcceptanceReport = await runAcceptanceChecks(ACCEPTANCE_FIXTURES);
 const REPORT_PATH = new URL('../../../docs/04-qa-acceptance.md', import.meta.url);
+const JSON_PATH = new URL('../../../docs/04-qa-acceptance.json', import.meta.url);
 
 afterAll(() => {
   if (process.env.ACCEPTANCE_REPORT === '1') {
     writeFileSync(REPORT_PATH, renderAcceptanceMarkdown(report), 'utf8');
+    writeFileSync(JSON_PATH, renderAcceptanceJson(report), 'utf8');
   }
 });
 
@@ -31,6 +35,34 @@ describe('committed acceptance report is fresh (M5.5 CI gate)', () => {
       committed,
       'docs/04-qa-acceptance.md is stale — run `npm run acceptance` and commit the result',
     ).toBe(renderAcceptanceMarkdown(report));
+
+    const committedJson = readFileSync(JSON_PATH, 'utf8');
+    expect(
+      committedJson,
+      'docs/04-qa-acceptance.json is stale — run `npm run acceptance` and commit the result',
+    ).toBe(renderAcceptanceJson(report));
+  });
+});
+
+describe('machine-readable acceptance summary (M5.5)', () => {
+  it('matches the rendered statuses', () => {
+    const summary = summarizeAcceptance(report);
+    expect(summary.total).toBe(7);
+    expect(summary.green + summary.yellow + summary.red).toBe(summary.total);
+    expect(summary.red).toBe(0);
+    expect(summary.automatedFailures).toBe(0);
+    expect(summary.green).toBe(1);
+    expect(summary.yellow).toBe(6);
+  });
+
+  it('renders stable JSON with one entry per criterion', () => {
+    const json = JSON.parse(renderAcceptanceJson(report)) as {
+      summary: { total: number };
+      checks: Array<{ id: number; status: string; assertions: unknown[] }>;
+    };
+    expect(json.summary.total).toBe(7);
+    expect(json.checks.map((c) => c.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(json.checks.every((c) => c.assertions.length > 0)).toBe(true);
   });
 });
 

@@ -490,6 +490,7 @@ const styles = StyleSheet.create({
   healthRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 44,
     paddingVertical: 7,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#8888',

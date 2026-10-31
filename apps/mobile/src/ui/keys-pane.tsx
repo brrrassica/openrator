@@ -487,12 +487,14 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   notice: { borderRadius: 8, borderWidth: 1, padding: 8, marginBottom: 10 },
-  keyRow: { flexDirection: 'row', alignItems: 'center' },
+  keyRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   windowRow: { flexDirection: 'row', marginTop: 10 },
   segment: {
     borderWidth: 1,
     borderRadius: 8,
-    // ≥ 40 px touch target (WCAG 2.5.5)
+    // ≥ 44 px touch target (M5.4 / WCAG 2.5.5)
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 13,
     paddingVertical: 9,
     marginRight: 8,

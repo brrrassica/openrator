@@ -492,3 +492,48 @@ export function renderAcceptanceMarkdown(report: AcceptanceReport): string {
   }
   return `${lines.join('\n').trimEnd()}\n`;
 }
+
+export interface AcceptanceSummary {
+  total: number;
+  green: number;
+  yellow: number;
+  red: number;
+  automatedFailures: number;
+}
+
+/** Machine-readable roll-up used by the JSON report and CI drift gate. */
+export function summarizeAcceptance(report: AcceptanceReport): AcceptanceSummary {
+  const summary: AcceptanceSummary = {
+    total: report.checks.length,
+    green: 0,
+    yellow: 0,
+    red: 0,
+    automatedFailures: 0,
+  };
+  for (const { row } of report.checks) {
+    summary[statusOf(row)] += 1;
+    if (!row.automated) summary.automatedFailures += 1;
+  }
+  return summary;
+}
+
+/**
+ * Deterministic JSON report (same ordering/content as the markdown report).
+ * Committed as `docs/04-qa-acceptance.json` and drift-checked in CI.
+ */
+export function renderAcceptanceJson(report: AcceptanceReport): string {
+  const payload = {
+    generatedFor: report.generatedFor,
+    summary: summarizeAcceptance(report),
+    checks: report.checks.map(({ row, assertions }) => ({
+      id: row.id,
+      criterion: row.criterion,
+      automated: row.automated,
+      deviceRequired: row.deviceRequired,
+      status: statusOf(row),
+      evidence: row.evidence,
+      assertions,
+    })),
+  };
+  return `${JSON.stringify(payload, null, 2)}\n`;
+}

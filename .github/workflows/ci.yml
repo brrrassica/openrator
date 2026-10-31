@@ -38,6 +38,10 @@ jobs:
         working-directory: apps/mobile
         run: npm run acceptance:check
 
+      - name: Device evidence validator
+        working-directory: apps/mobile
+        run: npm run acceptance:evidence
+
       - name: Typecheck
         working-directory: apps/mobile
         run: npx tsc --noEmit

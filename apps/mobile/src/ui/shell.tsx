@@ -235,6 +235,9 @@ const styles = StyleSheet.create({
   scopeChip: {
     borderWidth: 1,
     borderRadius: 999,
+    // ≥ 44 px touch target (M5.4 / WCAG 2.5.5)
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
     marginRight: 6,
@@ -245,13 +248,13 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingBottom: 24,
   },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 8 },
+  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingVertical: 8 },
   paneToggle: {
     flexDirection: 'row',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  seg: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6, marginRight: 8 },
+  seg: { borderRadius: 8, minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 6, marginRight: 8 },
   placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
 });

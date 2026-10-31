@@ -211,7 +211,7 @@ export default function PolicyPane({ engine, db, provider = 'openrouter' }: Prop
             <Text style={{ color: t.subtext, fontSize: 13, lineHeight: 19 }}>
               No presets found. Create one on the OpenRouter dashboard — OpenRator edits it here, live.
             </Text>
-            <Pressable onPress={() => void Linking.openURL(DASHBOARD_PRESETS_URL)}>
+            <Pressable hitSlop={12} onPress={() => void Linking.openURL(DASHBOARD_PRESETS_URL)}>
               <Text style={{ color: t.accent, fontSize: 12, fontWeight: '700', marginTop: 6 }}>
                 open dashboard presets ↗
               </Text>
@@ -296,7 +296,7 @@ export default function PolicyPane({ engine, db, provider = 'openrouter' }: Prop
           {'\n'}
           Routing favourites, ignore-lists and privacy are managed globally on the dashboard.
         </Text>
-        <Pressable onPress={() => void Linking.openURL(PREFERENCES_URL)}>
+        <Pressable hitSlop={12} onPress={() => void Linking.openURL(PREFERENCES_URL)}>
           <Text style={{ color: t.accent, fontSize: 12, fontWeight: '700', marginTop: 6 }}>
             manage globally ↗
           </Text>
@@ -311,11 +311,21 @@ const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
   cardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
   notice: { borderRadius: 8, borderWidth: 1, padding: 8, marginBottom: 10 },
-  chip: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, marginRight: 8 },
+  chip: {
+    borderWidth: 1,
+    borderRadius: 10,
+    // ≥ 44 px touch target (M5.4 / WCAG 2.5.5)
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginRight: 8,
+  },
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   providerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 44,
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#8888',

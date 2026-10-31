@@ -131,7 +131,7 @@ export default function CatalogPane({ engine, db, provider = 'all' }: Props) {
             <View style={styles.rowHeader}>
               <Text style={{ color: t.text, fontSize: 14, fontWeight: '700', flex: 1 }}>{p.name}</Text>
               {p.statusPageUrl ? (
-                <Pressable onPress={() => void Linking.openURL(p.statusPageUrl as string)}>
+                <Pressable hitSlop={12} onPress={() => void Linking.openURL(p.statusPageUrl as string)}>
                   <Text style={{ color: t.accent, fontSize: 11 }}>status ↗</Text>
                 </Pressable>
               ) : null}
@@ -167,6 +167,9 @@ const styles = StyleSheet.create({
   segment: {
     borderWidth: 1,
     borderRadius: 8,
+    // ≥ 44 px touch target (M5.4 / WCAG 2.5.5)
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginRight: 6,

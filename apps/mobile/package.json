@@ -34,6 +34,7 @@
     "test:watch": "vitest",
     "acceptance": "ACCEPTANCE_REPORT=1 vitest run tests/acceptance.test.ts",
     "acceptance:check": "ACCEPTANCE_VERIFY=1 vitest run tests/acceptance.test.ts",
+    "acceptance:evidence": "vitest run tests/device-evidence.test.ts",
     "typecheck": "tsc --noEmit",
     "assets:build": "node ../../scripts/brand/build-assets.mjs",
     "assets:check": "node ../../scripts/brand/build-assets.mjs --check"

@@ -383,6 +383,9 @@ const styles = StyleSheet.create({
   segment: {
     borderWidth: 1,
     borderRadius: 8,
+    // ≥ 44 px touch target (M5.4 / WCAG 2.5.5)
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 9,
     marginRight: 8,
