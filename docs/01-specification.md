@@ -1,7 +1,10 @@
 # OpenRator — Product Specification
 
+![OpenRator horizontal lockup](assets/lockup-horizontal.png)
+
 **Status:** Draft v0.1.0 · **Date:** 2026-10-05 · **Author:** PT Alat Cerdas (product/BD)
 **API surface verified against:** openrouter.ai/docs (llms.txt + OpenAPI reference pages) on 2026-10-05.
+**Brand:** mark, palette, and asset pipeline in [`06-brand-guide.md`](06-brand-guide.md).
 
 ---
 

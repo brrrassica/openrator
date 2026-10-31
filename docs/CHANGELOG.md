@@ -1,6 +1,24 @@
 # Changelog
 
-## [Unreleased] — WS2 (P1 robustness & UX)
+![OpenRator v0.2 release banner](assets/release-banner.png)
+
+## [Unreleased] — M6 brand system (v0.2)
+
+### Added
+- **M6.1–M6.8** Brand system: the approved eagle/chevron artwork is traced into
+  a vector master and every app icon, adaptive/monochrome icon, splash, favicon,
+  notification icon, lockup, wordmark, social preview, and release banner is
+  generated from it.
+- `brand/tokens.json` (palette, type, icon grid, provider monograms) and
+  [`docs/06-brand-guide.md`](06-brand-guide.md).
+- Deterministic pipeline: `scripts/brand/make-masters.mjs`,
+  `scripts/brand/build-assets.mjs`, `npm run assets:build`, and
+  `npm run assets:check` (CI drift gate on both GitHub and Gitea).
+- In-app identity: generated [`BrandMark`](../apps/mobile/src/ui/brand-mark.tsx),
+  SVG tab icon set, branded light/dark theme tokens, header mark, and onboarding
+  hero.
+
+## [WS2] — P1 robustness & UX
 
 ### Fixed
 - **WS2-1** Admin-key wire contract aligned to the documented API: PATCH/DELETE use

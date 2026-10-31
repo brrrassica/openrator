@@ -1,5 +1,7 @@
 # OpenRator — v0.1 QA checklist (M5.4/M5.5)
 
+<img src="assets/lockup-stacked.png" alt="OpenRator stacked lockup" width="220" />
+
 Grounding: spec §11 acceptance criteria. Column key: 🟢 = verified in this run,
 🟡 = needs a physical device / real account artifact, 🔴 = failed.
 

@@ -1,5 +1,7 @@
 # OpenRator — Spike Notes (M0)
 
+<img src="assets/mark-512.png" alt="OpenRator mark" width="96" />
+
 **Date:** 2026-10-05 · **Method:** live calls to `https://openrouter.ai/api/v1`
 with a standard (non-management) OpenRouter API key from the homelab env.
 No secrets are stored in this file. All payloads examined but not committed.

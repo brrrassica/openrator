@@ -42,6 +42,7 @@ Release runbook: `docs/04-qa-checklist.md` §4. Physical-device-only items
 - [`docs/04-ci-notes.md`](docs/04-ci-notes.md) — CI setup & ops notes (GitHub Actions + self-hosted Gitea/act_runner)
 - [`docs/04-qa-checklist.md`](docs/04-qa-checklist.md) — v0.1 acceptance + device matrix (M5)
 - [`docs/06-brand-guide.md`](docs/06-brand-guide.md) — mark, palette, typography, icon grid, asset pipeline
+- [`docs/assets/README.md`](docs/assets/README.md) — index and previews of every generated brand asset
 - [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — changelog
 - [`docs/RELEASE-NOTES-v0.1.0.md`](docs/RELEASE-NOTES-v0.1.0.md) — v0.1.0 release notes
 

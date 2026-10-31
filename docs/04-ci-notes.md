@@ -1,8 +1,10 @@
 # OpenRator — CI operations notes
 
-**Status 2026-10-05:** wired. CI is green (run validation: vitest + tsc +
-Android export). These notes capture the exact plumbing so it survives
-restarts, rebuilds, and future contributors.
+<img src="assets/mark-monochrome-512.png" alt="OpenRator monochrome mark" width="96" />
+
+**Status 2026-10-05:** wired. CI is green (run validation: brand asset drift
+check + vitest + tsc + Android export). These notes capture the exact plumbing
+so it survives restarts, rebuilds, and future contributors.
 
 ## Topology
 
@@ -47,9 +49,12 @@ git config core.hooksPath   # .githooks → versioned post-commit hook
 2. `actions/setup-node@v4` (node 22, npm cache declared)
 3. `npm ci` — wrapped in a 3× retry loop with `--fetch-retries=5` (homelab
    egress from job containers is flaky; observed `ECONNRESET`)
-4. `npx vitest run`
-5. `npx tsc --noEmit`
-6. `npx expo export --platform android --output-dir dist-ci`
+4. `npm run assets:check` — brand asset drift gate (regenerates every PNG from
+   its SVG master in memory and fails if a committed asset differs; see
+   [`06-brand-guide.md`](06-brand-guide.md))
+5. `npx vitest run`
+6. `npx tsc --noEmit`
+7. `npx expo export --platform android --output-dir dist-ci`
 
 ## Runner quirks (learned the hard way)
 
@@ -76,9 +81,9 @@ git config core.hooksPath   # .githooks → versioned post-commit hook
 
 ## GitHub Actions (cloud CI)
 
-- Workflow: `.github/workflows/ci.yml` — same three checks as Gitea
-  (vitest → `tsc --noEmit` → `expo export --platform android`), plus the
-  Android bundle uploaded as a `android-bundle` artifact (7-day retention).
+- Workflow: `.github/workflows/ci.yml` — same four checks as Gitea
+  (brand asset drift → vitest → `tsc --noEmit` → `expo export --platform android`),
+  plus the Android bundle uploaded as a `android-bundle` artifact (7-day retention).
 - Triggers: `push` to `main`/`m*`/`dev*` and every `pull_request`.
 - Dependency caching is left to `actions/setup-node` here — the 3× retry loop
   in the Gitea workflow exists only for the flaky LAN egress (see quirks).

@@ -1,7 +1,9 @@
 # OpenRator — Brand Guide (v0.2)
 
+![OpenRator horizontal lockup](assets/lockup-horizontal.png)
+
 **Status:** v0.2.0 work-in-progress. Tagline and final palette accent are still
-provisional (see §8).
+provisional (see §8). Full asset inventory: [`docs/assets/README.md`](assets/README.md).
 
 ---
 
@@ -55,6 +57,9 @@ master. CI should run it on every push.
   it on a busy photo, or combine it with a third-party logo.
 - **Monochrome:** always a single silhouette; Android themes the color.
 
+<img src="assets/mark-512.png" alt="OpenRator duotone mark" width="128" />
+<img src="assets/mark-monochrome-512.png" alt="OpenRator monochrome mark" width="128" />
+
 ### Lockups
 
 | Lockup | File | Use |
@@ -63,6 +68,14 @@ master. CI should run it on every push.
 | Stacked | [`brand/svg/lockup-stacked.svg`](../brand/svg/lockup-stacked.svg) | Splash, release art, square placements |
 | Wordmark only | [`brand/svg/wordmark.svg`](../brand/svg/wordmark.svg) | Narrow spaces; never smaller than 96 px wide |
 | Social preview | [`brand/svg/social-preview.svg`](../brand/svg/social-preview.svg) | Gitea/GitHub link preview, release banner |
+
+<img src="assets/wordmark.png" alt="OpenRator wordmark" width="520" />
+
+<img src="assets/lockup-stacked.png" alt="OpenRator stacked lockup" width="320" />
+
+![OpenRator social preview](assets/social-preview.png)
+
+![OpenRator v0.2 release banner](assets/release-banner.png)
 
 ---
 
@@ -129,6 +142,14 @@ Generated files:
 - [`apps/mobile/assets/splash-icon.png`](../apps/mobile/assets/splash-icon.png)
 - [`apps/mobile/assets/favicon.png`](../apps/mobile/assets/favicon.png)
 - [`apps/mobile/assets/notification-icon.png`](../apps/mobile/assets/notification-icon.png)
+
+<img src="../apps/mobile/assets/icon.png" alt="OpenRator app icon" width="112" />
+<img src="../apps/mobile/assets/android-icon-foreground.png" alt="Adaptive icon foreground" width="112" />
+<img src="../apps/mobile/assets/android-icon-background.png" alt="Adaptive icon background" width="112" />
+<img src="../apps/mobile/assets/android-icon-monochrome.png" alt="Android 13 monochrome icon" width="112" />
+<img src="../apps/mobile/assets/splash-icon.png" alt="Splash mark" width="112" />
+<img src="../apps/mobile/assets/favicon.png" alt="Favicon" width="48" />
+<img src="../apps/mobile/assets/notification-icon.png" alt="Notification icon" width="48" />
 
 Notification icons must be **white on transparent**; Android tints them.
 

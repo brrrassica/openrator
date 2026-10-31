@@ -1,5 +1,7 @@
 # OpenRator — v0.1 Roadmap
 
+![OpenRator horizontal lockup](assets/lockup-horizontal.png)
+
 **Owner:** PT Alat Cerdas · **App:** OpenRator (Expo/React Native)
 **Basis:** spec `01-specification.md` · Estimates assume 1 dev + AI coding
 assistance (deepseek-v4-flash-0731 via opencode) on a local Linux workstation.

@@ -1,5 +1,7 @@
 # OpenRator v0.1.0 — release notes (draft)
 
+![OpenRator horizontal lockup](assets/lockup-horizontal.png)
+
 **Status:** code-complete + CI-verified + **production APK built** (2026-10-07); device
 sideload/soak pending (see `docs/04-qa-checklist.md`).
 **Scope:** Android only (D6: iOS out of v0.1). Personal use (D4); distributed as a
