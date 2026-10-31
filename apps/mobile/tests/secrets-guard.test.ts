@@ -94,14 +94,19 @@ describe('secrets guard (static scan)', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('network targets are whitelisted (openrouter.ai only in static URLs)', () => {
+  it('network targets are whitelisted (openrouter.ai + opencode.ai only)', () => {
     const offenders: string[] = [];
+    const allowed = [
+      'https://openrouter.ai',
+      'https://stats.openrouter.ai',
+      'https://opencode.ai',
+    ];
     for (const f of FILES) {
       const lines = fs.readFileSync(f, 'utf8').split('\n');
       lines.forEach((line, i) => {
         const urls = [...line.matchAll(/https?:\/\/[^'"\s]+/g)].map((m) => m[0]);
         for (const u of urls) {
-          if (!u.startsWith('https://openrouter.ai') && !u.startsWith('https://stats.openrouter.ai')) {
+          if (!allowed.some((host) => u.startsWith(host))) {
             offenders.push(`${path.relative(f, SRC)}:${i + 1} ${u}`);
           }
         }

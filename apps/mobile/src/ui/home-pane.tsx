@@ -20,13 +20,16 @@ import {
   getKeyRows,
   getProviderSetting,
   getSetting,
+  listManualUsage,
   listProvidersFromDb,
 } from '../store/daos';
 import { SyncEngine, isStale } from '../sync/sync-engine';
 import { POLL } from '../core/config';
 import { DailyRollup, KeyRow, Provider } from '../core/types';
-import { ProviderId } from '../providers/types';
+import { buildPlanInfo, planSettingSuffix } from '../core/plan';
+import { PlanInfo, PlanUsageWindow, ProviderId } from '../providers/types';
 import { getDescriptor } from '../providers/registry';
+import { PLAN_WINDOW_LABELS, PLAN_WINDOW_ORDER } from '../providers/opencode/common';
 import { combineKeyRows, sumCredits } from './aggregate';
 import { computeHomeSummary, HomeSummary, problemProviders, resetLabel } from './home-summary';
 import { fmtCount, fmtUsd, limitLabel } from './chart-math';
@@ -39,6 +42,16 @@ interface Props {
   provider?: 'all' | ProviderId;
 }
 
+interface ScopedPlan {
+  provider: ProviderId;
+  plan: PlanInfo;
+}
+
+interface ManualRow {
+  provider: ProviderId;
+  amountUsd: number;
+}
+
 interface HomeData {
   key: KeyRow | null;
   rollups: DailyRollup[];
@@ -46,6 +59,8 @@ interface HomeData {
   today: string;
   creditsTotal: number;
   creditsUsage: number;
+  plans: ScopedPlan[];
+  manual: ManualRow[];
 }
 
 export default function HomePane({ engine, db, provider = 'all' }: Props) {
@@ -83,6 +98,35 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
           };
         }),
       );
+      // M8: OpenCode Go percent windows live in provider-scoped settings.
+      const plans: ScopedPlan[] = [];
+      for (const id of ids) {
+        const settings: Record<string, string | null> = {
+          'account.plan_name': await getProviderSetting(db, id, 'account.plan_name'),
+          'account.plan_status': await getProviderSetting(db, id, 'account.plan_status'),
+          'account.plan_renews_at': await getProviderSetting(db, id, 'account.plan_renews_at'),
+          'account.plan_amount_usd': await getProviderSetting(db, id, 'account.plan_amount_usd'),
+        };
+        for (const window of PLAN_WINDOW_ORDER) {
+          settings[planSettingSuffix(window, 'used_pct')] = await getProviderSetting(
+            db,
+            id,
+            planSettingSuffix(window, 'used_pct'),
+          );
+          settings[planSettingSuffix(window, 'resets_at')] = await getProviderSetting(
+            db,
+            id,
+            planSettingSuffix(window, 'resets_at'),
+          );
+        }
+        const plan = buildPlanInfo(settings);
+        if (plan && plan.windows && plan.windows.length > 0) plans.push({ provider: id, plan });
+      }
+      const month = new Date().toISOString().slice(0, 7);
+      const manualRows = await listManualUsage(db, providerFilter);
+      const manual: ManualRow[] = manualRows
+        .filter((r) => r.month === month && ids.includes(r.provider as ProviderId))
+        .map((r) => ({ provider: r.provider as ProviderId, amountUsd: r.amountUsd }));
       const key =
         provider === 'all'
           ? combineKeyRows(keyRows, 'All providers')
@@ -97,6 +141,8 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
           today,
           creditsTotal: totals.total,
           creditsUsage: totals.usage,
+          plans,
+          manual,
         });
       }
     } catch {
@@ -152,6 +198,15 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
   });
   // Home health strip: only providers with a status page that are unhealthy.
   const issues = problemProviders(summary.providers);
+  const manualProviders = provider === 'all' ? scopeIds : [provider];
+  const manualCapable = manualProviders.filter((id) => engine.getCapabilities(id)?.manualBudget);
+  const showCredits =
+    provider === 'all'
+      ? scopeIds.some((id) => engine.getCapabilities(id)?.accountBalance)
+      : Boolean(engine.getCapabilities(provider)?.accountBalance);
+  const showKeyCard =
+    provider === 'all' ? true : Boolean(engine.getCapabilities(provider)?.spendWindows);
+  const manualTotal = data.manual.reduce((s, m) => s + m.amountUsd, 0);
 
   return (
     <ScrollView
@@ -167,7 +222,8 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
         </View>
       ) : null}
 
-      {/* Account credits — the primary figure */}
+      {/* Account credits — only for providers that expose a balance */}
+      {showCredits ? (
       <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={styles.cardHeader}>
           <Text style={[styles.cardTitle, { color: t.text }]}>{scopeName} Credits</Text>
@@ -198,8 +254,47 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
           />
         </View>
       </View>
+      ) : null}
+
+      {/* Subscription plan windows (OpenCode Go) */}
+      {data.plans.length > 0
+        ? data.plans.map(({ provider: planProvider, plan }) => (
+            <View
+              key={planProvider}
+              style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={[styles.cardTitle, { color: t.text }]}>
+                  {getDescriptor(planProvider).displayName} — {plan.name}
+                </Text>
+                <View style={[styles.chip, { backgroundColor: t.border }]}>
+                  <Text style={{ color: t.subtext, fontSize: 11 }}>{plan.status}</Text>
+                </View>
+              </View>
+              <PlanWindowRows windows={plan.windows ?? []} />
+            </View>
+          ))
+        : null}
+
+      {/* Manual fallback for providers without a verified usage API */}
+      {manualCapable.length > 0 ? (
+        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+          <View style={styles.cardHeader}>
+            <Text style={[styles.cardTitle, { color: t.text }]}>Manual budget</Text>
+            <View style={[styles.chip, { backgroundColor: t.border }]}>
+              <Text style={{ color: t.subtext, fontSize: 11 }}>user-entered</Text>
+            </View>
+          </View>
+          <Text style={[styles.balance, { color: t.text }]}>{fmtUsd(manualTotal)}</Text>
+          <Text style={{ color: t.subtext, fontSize: 13 }}>
+            {manualCapable.map((id) => getDescriptor(id).displayName).join(', ')} — add or edit
+            this month’s amount in Accounts.
+          </Text>
+        </View>
+      ) : null}
 
       {/* API key usage / limits — secondary */}
+      {showKeyCard ? (
       <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={styles.cardHeader}>
           <Text style={[styles.cardTitle, { color: t.text }]}>
@@ -235,6 +330,7 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
           <WindowStat label="last 7d" value={fmtUsd(summary.spend7d)} />
         </View>
       </View>
+      ) : null}
 
       {/* Warnings */}
       {summary.warnings.map((w) => (
@@ -315,6 +411,46 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
         )}
       </View>
     </ScrollView>
+  );
+}
+
+function PlanWindowRows({ windows }: { windows: PlanUsageWindow[] }) {
+  const t = useTheme();
+  if (windows.length === 0) {
+    return (
+      <Text style={{ color: t.subtext, fontSize: 13 }}>
+        No plan usage reported yet — pull to refresh.
+      </Text>
+    );
+  }
+  return (
+    <View style={{ marginTop: 8 }}>
+      {windows.map((w) => {
+        const color = w.usedPct >= 90 ? t.danger : w.usedPct >= 75 ? t.warn : t.ok;
+        return (
+          <View key={w.window} style={{ marginBottom: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ color: t.subtext, fontSize: 12 }}>
+                {PLAN_WINDOW_LABELS[w.window] ?? w.window}
+              </Text>
+              <Text style={{ color, fontSize: 12, fontWeight: '700' }}>
+                {w.usedPct.toFixed(0)}% used
+              </Text>
+            </View>
+            <View style={[styles.limitTrack, { backgroundColor: t.border }]}>
+              <View
+                style={[styles.limitFill, { width: `${w.usedPct}%`, backgroundColor: color }]}
+              />
+            </View>
+            {w.resetsAt ? (
+              <Text style={{ color: t.subtext, fontSize: 10, marginTop: 3 }}>
+                resets {w.resetsAt}
+              </Text>
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 

@@ -62,8 +62,9 @@ export default function OnboardingScreen({
       <Text style={[styles.tagline, { color: t.subtext }]}>One pane for every AI bill</Text>
       <Text style={[styles.body, { color: t.subtext }]}>
         Paste your {provider.displayName} API key. It is stored only on this
-        device and sent only to {provider.id === 'openrouter' ? 'openrouter.ai' : 'the provider'}{' '}
-        over TLS. OpenRator never logs it.
+        device and sent only to{' '}
+        {provider.id === 'openrouter' ? 'openrouter.ai' : 'opencode.ai'} over TLS.
+        OpenRator never logs it.
       </Text>
 
       {providers.length > 1 ? (
@@ -108,7 +109,7 @@ export default function OnboardingScreen({
         style={[styles.input, { color: t.text, borderColor: t.border, backgroundColor: t.card }]}
         value={key}
         onChangeText={setKey}
-        placeholder={provider.id === 'openrouter' ? 'sk-or-v1-…' : 'provider key'}
+        placeholder={provider.id === 'openrouter' ? 'sk-or-v1-…' : 'opencode key'}
         placeholderTextColor={t.subtext}
         secureTextEntry
         autoCapitalize="none"

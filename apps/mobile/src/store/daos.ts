@@ -275,6 +275,83 @@ export async function setProviderSetting(
   await writeSetting(db, providerSettingKey(provider, key), value);
 }
 
+// ---- manual usage (capability-limited providers, M8.5) -------------------
+
+export interface ManualUsageRow {
+  provider: string;
+  /** Calendar month, `YYYY-MM`. */
+  month: string;
+  amountUsd: number;
+  note: string | null;
+  updatedAt: string;
+}
+
+/** Insert or replace one provider's manual amount for a month. */
+export async function upsertManualUsage(db: SqlDb, row: ManualUsageRow): Promise<void> {
+  await db.runAsync(
+    `INSERT OR REPLACE INTO usage_manual
+       (provider, month, amount_usd, note, updated_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    row.provider,
+    row.month,
+    row.amountUsd,
+    row.note ?? null,
+    row.updatedAt,
+  );
+}
+
+export async function getManualUsage(
+  db: SqlDb,
+  provider: string,
+  month: string,
+): Promise<ManualUsageRow | null> {
+  const r = await db.getFirstAsync<Record<string, unknown>>(
+    'SELECT provider, month, amount_usd, note, updated_at FROM usage_manual WHERE provider = ? AND month = ?',
+    provider,
+    month,
+  );
+  return r ? rowToManualUsage(r) : null;
+}
+
+export async function listManualUsage(
+  db: SqlDb,
+  provider?: string,
+): Promise<ManualUsageRow[]> {
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    'SELECT provider, month, amount_usd, note, updated_at FROM usage_manual' +
+      (provider ? ' WHERE provider = ?' : '') +
+      ' ORDER BY month DESC',
+    ...(provider ? [provider] : []),
+  );
+  return rows.map(rowToManualUsage);
+}
+
+export async function deleteManualUsage(
+  db: SqlDb,
+  provider: string,
+  month?: string,
+): Promise<void> {
+  if (month) {
+    await db.runAsync(
+      'DELETE FROM usage_manual WHERE provider = ? AND month = ?',
+      provider,
+      month,
+    );
+    return;
+  }
+  await db.runAsync('DELETE FROM usage_manual WHERE provider = ?', provider);
+}
+
+function rowToManualUsage(r: Record<string, unknown>): ManualUsageRow {
+  return {
+    provider: String(r.provider),
+    month: String(r.month),
+    amountUsd: Number(r.amount_usd ?? 0),
+    note: (r.note as string | null) ?? null,
+    updatedAt: String(r.updated_at ?? ''),
+  };
+}
+
 // ---- keys ----------------------------------------------------------------
 
 export async function upsertKeyRow(db: SqlDb, row: KeyRow): Promise<void> {

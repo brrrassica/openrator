@@ -7,6 +7,7 @@
 import { CredentialService } from '../core/credentials';
 import { getDescriptor } from './registry';
 import { createOpenRouterAdapter } from './openrouter/adapter';
+import { OpenCodeGoAdapter } from './opencode-go/adapter';
 import { OpenCodeZenAdapter } from './opencode-zen/adapter';
 import { ProviderAdapter, ProviderId } from './types';
 
@@ -17,8 +18,11 @@ export function createAdapter(
   switch (provider) {
     case 'openrouter':
       return createOpenRouterAdapter(() => creds.getCredential('openrouter'));
+    case 'opencode-go':
+      // Live transport is gated until M8.1; tests inject fixtures directly.
+      return new OpenCodeGoAdapter();
     case 'opencode-zen':
-      // Live transport is gated until M8. A fixture can be injected in tests.
+      // Live transport is gated until M8.1; tests inject fixtures directly.
       return new OpenCodeZenAdapter();
   }
 }

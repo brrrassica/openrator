@@ -1,9 +1,10 @@
 /**
- * OpenRator — OpenCode Zen adapter (fixture-backed, M7.8).
+ * OpenRator — OpenCode Zen adapter (fixture-backed, M7.8 / M8).
  *
- * Live transport is intentionally gated until M8.1 verifies the API. The
- * adapter already speaks the normalized contract so the orchestrator and UI
- * can be exercised against fixtures without pretending a metric exists.
+ * OpenCode Zen is the pay-as-you-go product. The API reports balances in
+ * microcents; this adapter normalizes everything to USD so screens and the
+ * store never see provider-specific units. Live transport stays gated until
+ * M8.1 verifies the endpoints.
  */
 
 import { shortHash } from '../../core/fingerprint';
@@ -19,11 +20,30 @@ import {
   UsageRange,
   UsageRecord,
 } from '../types';
+import { microcentsToUsd } from '../opencode/common';
 
 export interface ZenFixture {
-  account?: Partial<AccountSnapshot> & { key?: string };
+  account?: Partial<AccountSnapshot> & {
+    key?: string;
+    /** Raw Zen wire values; converted to USD below. */
+    balanceMicrocents?: number;
+    usageMicrocents?: number;
+    usageDailyMicrocents?: number;
+    usageWeeklyMicrocents?: number;
+    usageMonthlyMicrocents?: number;
+  };
   usage?: UsageRecord[];
   catalog?: ProviderCatalogEntry[];
+}
+
+/** Prefer an explicit USD field, otherwise convert the microcent wire value. */
+function usd(
+  explicit: number | undefined,
+  microcents: number | undefined,
+): number | undefined {
+  if (explicit !== undefined) return explicit;
+  if (microcents !== undefined) return microcentsToUsd(microcents);
+  return undefined;
 }
 
 export class OpenCodeZenAdapter implements ProviderAdapter {
@@ -54,6 +74,8 @@ export class OpenCodeZenAdapter implements ProviderAdapter {
     if (!account) {
       throw new Error('OpenCode Zen API is not verified yet (M8.1)');
     }
+    const balanceTotal = usd(account.balanceTotal, account.balanceMicrocents);
+    const balanceUsage = usd(account.balanceUsage, account.usageMicrocents);
     return {
       provider: this.id,
       label: account.label ?? 'OpenCode Zen',
@@ -61,13 +83,13 @@ export class OpenCodeZenAdapter implements ProviderAdapter {
       limit: account.limit ?? 0,
       limitRemaining: account.limitRemaining ?? 0,
       limitReset: account.limitReset ?? null,
-      usage: account.usage ?? 0,
-      usageDaily: account.usageDaily ?? 0,
-      usageWeekly: account.usageWeekly ?? 0,
-      usageMonthly: account.usageMonthly ?? 0,
+      usage: account.usage ?? balanceUsage ?? 0,
+      usageDaily: usd(account.usageDaily, account.usageDailyMicrocents) ?? 0,
+      usageWeekly: usd(account.usageWeekly, account.usageWeeklyMicrocents) ?? 0,
+      usageMonthly: usd(account.usageMonthly, account.usageMonthlyMicrocents) ?? 0,
       expiresAt: account.expiresAt ?? null,
-      balanceTotal: account.balanceTotal,
-      balanceUsage: account.balanceUsage,
+      balanceTotal,
+      balanceUsage,
       plan: account.plan ?? null,
       fingerprint: shortHash(credential.key),
       updatedAt: new Date().toISOString(),

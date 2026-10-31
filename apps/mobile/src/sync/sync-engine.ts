@@ -9,6 +9,7 @@
 import { ACTIVITY_WINDOW_DAYS, POLL } from '../core/config';
 import { OpenRouterClient } from '../core/client';
 import { CredentialService } from '../core/credentials';
+import { planInfoSettingEntries, planWindowSettingEntries } from '../core/plan';
 import { addDays, computeDailyRollups, fmtDay } from './rollups';
 import { SqlDb } from '../store/db';
 import {
@@ -220,6 +221,18 @@ export class SyncEngine {
       await setProviderSetting(this.db, provider, 'credential.key_hash', snapshot.fingerprint);
       await setProviderSetting(this.db, provider, 'account.label', snapshot.label);
 
+      // M8: subscription plans (OpenCode Go) persist percent windows so the
+      // Home pane can render them after an app restart / offline.
+      if (snapshot.plan) {
+        for (const entry of planInfoSettingEntries(snapshot.plan)) {
+          await setProviderSetting(this.db, provider, entry.key, entry.value);
+        }
+        const windows = snapshot.planWindows ?? snapshot.plan.windows ?? [];
+        for (const entry of planWindowSettingEntries(windows)) {
+          await setProviderSetting(this.db, provider, entry.key, entry.value);
+        }
+      }
+
       // Preserve v0.1 global settings for the primary provider and legacy UI.
       if (provider === 'openrouter') {
         await setSetting(this.db, 'credential.key_hash', snapshot.fingerprint);
@@ -248,7 +261,11 @@ export class SyncEngine {
       return null;
     }
     const credential = await this.credential(provider);
-    if (!credential || (!credential.isManagement && !credential.managementKey)) {
+    // OpenRouter gates /activity behind a management key. Providers that
+    // expose activity with the normal key are governed only by capabilities.
+    const needsManagement =
+      provider === 'openrouter' && !credential?.isManagement && !credential?.managementKey;
+    if (!credential || needsManagement) {
       this.touch(provider, 'activity', 'management key required');
       return null;
     }

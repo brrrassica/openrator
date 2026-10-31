@@ -7,11 +7,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CredentialService } from '../core/credentials';
-import { clearAllData, getProviderSetting } from '../store/daos';
+import { planInfoSettingEntries, planWindowSettingEntries } from '../core/plan';
+import {
+  clearAllData,
+  getManualUsage,
+  getProviderSetting,
+  setProviderSetting,
+  upsertManualUsage,
+} from '../store/daos';
 import { SqlDb } from '../store/db';
 import { SyncEngine } from '../sync/sync-engine';
 import { listDescriptors } from '../providers/registry';
-import { ProviderId } from '../providers/types';
+import { PlanUsageWindow, PlanWindowId, ProviderId } from '../providers/types';
+import { PLAN_WINDOW_LABELS, PLAN_WINDOW_ORDER, clampPct } from '../providers/opencode/common';
 import { useTheme } from './theme';
 
 interface Props {
@@ -38,6 +46,15 @@ export default function AccountsPane({
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [manualAmount, setManualAmount] = useState('');
+  const [planName, setPlanName] = useState('');
+  const [planPct, setPlanPct] = useState<Record<PlanWindowId, string>>({
+    five_hour: '',
+    weekly: '',
+    monthly: '',
+  });
+  const [manualSaved, setManualSaved] = useState(false);
+  const month = new Date().toISOString().slice(0, 7);
 
   const load = useCallback(async () => {
     const ids = await creds.providersWithKeys();
@@ -60,6 +77,30 @@ export default function AccountsPane({
 
   const descriptor = providers.find((p) => p.id === selected) ?? providers[0];
 
+  // M8.5: load any manual fallback values when the selected provider changes.
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      const [row, name] = await Promise.all([
+        getManualUsage(db, selected, month),
+        getProviderSetting(db, selected, 'account.plan_name'),
+      ]);
+      const pcts: Record<PlanWindowId, string> = { five_hour: '', weekly: '', monthly: '' };
+      for (const window of PLAN_WINDOW_ORDER) {
+        pcts[window] =
+          (await getProviderSetting(db, selected, `plan.window.${window}.used_pct`)) ?? '';
+      }
+      if (cancel) return;
+      setManualAmount(row ? String(row.amountUsd) : '');
+      setPlanName(name ?? '');
+      setPlanPct(pcts);
+      setManualSaved(false);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [db, selected, month]);
+
   const add = async () => {
     if (busy || !descriptor) return;
     if (!descriptor.keyPattern.test(key.trim())) {
@@ -76,6 +117,48 @@ export default function AccountsPane({
       setKey('');
       setMgmtKey('');
       await load();
+      onAccountsChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveManual = async () => {
+    if (busy || !descriptor) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const amount = Number(manualAmount);
+      await upsertManualUsage(db, {
+        provider: selected,
+        month,
+        amountUsd: Number.isFinite(amount) && amount > 0 ? amount : 0,
+        note: 'manual',
+        updatedAt: new Date().toISOString(),
+      });
+      if (descriptor.capabilities.planWindows) {
+        const windows: PlanUsageWindow[] = PLAN_WINDOW_ORDER.map((window) => ({
+          window,
+          usedPct: clampPct(Number(planPct[window] || 0)),
+          resetsAt: null,
+        }));
+        const plan = {
+          name: planName.trim() || descriptor.displayName,
+          status: 'active',
+          renewsAt: null,
+          amountUsd: Number.isFinite(amount) && amount > 0 ? amount : null,
+          windows,
+        };
+        for (const entry of planInfoSettingEntries(plan)) {
+          await setProviderSetting(db, selected, entry.key, entry.value);
+        }
+        for (const entry of planWindowSettingEntries(windows)) {
+          await setProviderSetting(db, selected, entry.key, entry.value);
+        }
+      }
+      setManualSaved(true);
       onAccountsChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -191,6 +274,78 @@ export default function AccountsPane({
         </Pressable>
       </View>
 
+      {descriptor?.capabilities.manualBudget ? (
+        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+          <View style={styles.row}>
+            <Text style={[styles.cardTitle, { color: t.text, flex: 1, marginBottom: 0 }]}>
+              Manual tracking — {descriptor.displayName}
+            </Text>
+            <View style={[styles.segment, { borderColor: t.border, paddingVertical: 3 }]}>
+              <Text style={{ color: t.subtext, fontSize: 10 }}>user-entered</Text>
+            </View>
+          </View>
+          <Text style={{ color: t.subtext, fontSize: 12, marginTop: 6, lineHeight: 18 }}>
+            {descriptor.capabilities.planWindows
+              ? 'OpenCode Go exposes percentage windows through its API. Until M8.1 verifies it, enter this month’s plan usage manually.'
+              : 'OpenCode Zen reports balances in microcents. Until M8.1 verifies it, enter this month’s spend manually.'}
+          </Text>
+
+          <Text style={[styles.fieldLabel, { color: t.text }]}>This month’s amount (USD, {month})</Text>
+          <TextInput
+            style={[styles.input, { color: t.text, borderColor: t.border, backgroundColor: t.bg }]}
+            value={manualAmount}
+            onChangeText={setManualAmount}
+            placeholder="0.00"
+            placeholderTextColor={t.subtext}
+            keyboardType="numeric"
+          />
+
+          {descriptor.capabilities.planWindows ? (
+            <>
+              <Text style={[styles.fieldLabel, { color: t.text }]}>Plan name</Text>
+              <TextInput
+                style={[styles.input, { color: t.text, borderColor: t.border, backgroundColor: t.bg }]}
+                value={planName}
+                onChangeText={setPlanName}
+                placeholder={descriptor.displayName}
+                placeholderTextColor={t.subtext}
+              />
+              {PLAN_WINDOW_ORDER.map((window) => (
+                <View key={window}>
+                  <Text style={[styles.fieldLabel, { color: t.text }]}>
+                    {PLAN_WINDOW_LABELS[window]} used (%)
+                  </Text>
+                  <TextInput
+                    style={[styles.input, { color: t.text, borderColor: t.border, backgroundColor: t.bg }]}
+                    value={planPct[window]}
+                    onChangeText={(v) => setPlanPct((prev) => ({ ...prev, [window]: v }))}
+                    placeholder="0–100"
+                    placeholderTextColor={t.subtext}
+                    keyboardType="numeric"
+                  />
+                </View>
+              ))}
+            </>
+          ) : null}
+
+          <Pressable
+            style={[styles.segment, { borderColor: t.accent, alignSelf: 'flex-start', marginTop: 10 }]}
+            onPress={() => void saveManual()}
+            disabled={busy}
+            accessibilityRole="button"
+          >
+            <Text style={{ color: t.accent, fontSize: 12, fontWeight: '700' }}>
+              {busy ? 'saving…' : manualSaved ? 'saved ✓' : 'save manual values'}
+            </Text>
+          </Pressable>
+          {manualSaved ? (
+            <Text style={{ color: t.ok, fontSize: 11, marginTop: 6 }}>
+              Saved — Home and Spend now include this manual value.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
         <Text style={[styles.cardTitle, { color: t.text }]}>Sign out</Text>
         <Text style={{ color: t.subtext, fontSize: 13, lineHeight: 19 }}>
@@ -239,4 +394,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 8,
   },
+  fieldLabel: { fontSize: 12, fontWeight: '600', marginTop: 10 },
 });

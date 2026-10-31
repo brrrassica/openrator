@@ -16,11 +16,17 @@ import {
   View,
 } from 'react-native';
 import { SqlDb } from '../store/db';
-import { getActivityRows, getKeyRows, listProvidersFromDb } from '../store/daos';
+import {
+  getActivityRows,
+  getKeyRows,
+  listManualUsage,
+  listProvidersFromDb,
+} from '../store/daos';
 import { SyncEngine, isStale } from '../sync/sync-engine';
 import { POLL } from '../core/config';
 import { addDays } from '../sync/rollups';
 import { ActivityRow, KeyRow, Provider } from '../core/types';
+import { getDescriptor } from '../providers/registry';
 import { ProviderId } from '../providers/types';
 import { combineKeyRows } from './aggregate';
 import { computeSpendSummary } from './spend-summary';
@@ -41,6 +47,7 @@ export default function SpendPane({ engine, db, provider = 'all' }: Props) {
   const [rows, setRows] = useState<ActivityRow[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [key, setKey] = useState<KeyRow | null>(null);
+  const [manualTotal, setManualTotal] = useState(0);
   const [period, setPeriod] = useState(30);
   const [rankBy, setRankBy] = useState<'spend' | 'requests'>('spend');
   const [refreshing, setRefreshing] = useState(false);
@@ -52,11 +59,18 @@ export default function SpendPane({ engine, db, provider = 'all' }: Props) {
       const today = new Date().toISOString().slice(0, 10);
       const from = addDays(today, -34); // 35-day retention guard
       const providerFilter = provider === 'all' ? undefined : provider;
-      const [act, prov, keys] = await Promise.all([
+      const [act, prov, keys, manualRows] = await Promise.all([
         getActivityRows(db, { fromDay: from, provider: providerFilter }),
         listProvidersFromDb(db, providerFilter),
         getKeyRows(db, providerFilter),
+        listManualUsage(db, providerFilter),
       ]);
+      const month = today.slice(0, 7);
+      setManualTotal(
+        manualRows
+          .filter((r) => r.month === month)
+          .reduce((s, r) => s + r.amountUsd, 0),
+      );
       const k =
         provider === 'all'
           ? combineKeyRows(keys, 'All providers')
@@ -115,7 +129,7 @@ export default function SpendPane({ engine, db, provider = 'all' }: Props) {
       ) : null}
 
       {activityLocked ? (
-        <FallbackView keyRow={key} theme={t} />
+        <FallbackView keyRow={key} theme={t} manualTotal={manualTotal} />
       ) : summary.hasActivity ? (
         <>
           {/* period + rank toggles */}
@@ -239,11 +253,16 @@ export default function SpendPane({ engine, db, provider = 'all' }: Props) {
           </View>
         </>
       ) : (
-        <View style={[styles.notice, { backgroundColor: t.accent + '18', borderColor: t.accent + '44' }]}>
-          <Text style={{ color: t.accent, fontSize: 13 }}>
-            No activity recorded yet — pull down to sync (management key required).
-          </Text>
-        </View>
+        <FallbackView
+          keyRow={key}
+          theme={t}
+          manualTotal={manualTotal}
+          explainer={
+            provider !== 'all' && !engine.getCapabilities(provider)?.activityHistory
+              ? `${getDescriptor(provider).displayName} does not expose payable activity history. Plan usage and manual amounts are shown on Home.`
+              : undefined
+          }
+        />
       )}
     </ScrollView>
   );
@@ -297,20 +316,36 @@ function EndpointRows({
   );
 }
 
-/** M3.4 — no management key: explainer + key spend windows from /key. */
-function FallbackView({ keyRow, theme: t }: { keyRow: KeyRow | null; theme: ReturnType<typeof useTheme> }) {
+/** M3.4/M8 — explainer + key spend windows and manual fallback amounts. */
+function FallbackView({
+  keyRow,
+  theme: t,
+  manualTotal = 0,
+  explainer,
+}: {
+  keyRow: KeyRow | null;
+  theme: ReturnType<typeof useTheme>;
+  manualTotal?: number;
+  explainer?: string;
+}) {
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-      <Text style={[styles.cardTitle, { color: t.text }]}>30-day analytics locked</Text>
+      <Text style={[styles.cardTitle, { color: t.text }]}>
+        {explainer ? 'Endpoint analytics unavailable' : '30-day analytics locked'}
+      </Text>
       <Text style={{ color: t.subtext, fontSize: 13, lineHeight: 19, marginTop: 4 }}>
-        Add a management key in Keys (M4) to unlock 30-day spend by endpoint.
-        Until then here's this key's spend from /key:
+        {explainer ??
+          'Add a management key in Keys (M4) to unlock 30-day spend by endpoint. Until then here is this key’s spend from /key:'}
       </Text>
       <View style={styles.windowRow}>
         <Total label="today" value={fmtUsd(keyRow?.usageDaily ?? 0)} />
         <Total label="this week" value={fmtUsd(keyRow?.usageWeekly ?? 0)} />
         <Total label="this month" value={fmtUsd(keyRow?.usageMonthly ?? 0)} />
+        <Total label="manual" value={fmtUsd(manualTotal)} />
       </View>
+      <Text style={{ color: t.subtext, fontSize: 11, marginTop: 6 }}>
+        Manual amounts are entered in Accounts and labeled as user-provided.
+      </Text>
     </View>
   );
 }

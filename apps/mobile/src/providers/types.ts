@@ -8,7 +8,7 @@
 
 import { AdminKey, AdminKeyCreated, Preset, PresetConfig } from '../core/types';
 
-export const PROVIDER_IDS = ['openrouter', 'opencode-zen'] as const;
+export const PROVIDER_IDS = ['openrouter', 'opencode-go', 'opencode-zen'] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export interface ProviderCapabilities {
@@ -19,6 +19,9 @@ export interface ProviderCapabilities {
   providerCatalog: boolean;
   routingPolicy: boolean;
   subscriptionPlan: boolean;
+  /** Subscription usage measured as a percentage per rolling window (Go). */
+  planWindows: boolean;
+  /** Provider can only be tracked through user-entered manual amounts. */
   manualBudget: boolean;
 }
 
@@ -75,9 +78,23 @@ export interface AccountSnapshot {
   balanceUsage?: number;
   /** Subscription/plan card when the provider exposes it. */
   plan?: PlanInfo | null;
+  /**
+   * Percentage-based plan windows (OpenCode Go). Each window is a share of the
+   * plan allowance, not a currency amount.
+   */
+  planWindows?: PlanUsageWindow[];
   /** Non-secret short fingerprint persisted in SQLite. */
   fingerprint: string;
   updatedAt: string;
+}
+
+export type PlanWindowId = 'five_hour' | 'weekly' | 'monthly';
+
+export interface PlanUsageWindow {
+  window: PlanWindowId;
+  /** Used share of the plan allowance, clamped to 0..100. */
+  usedPct: number;
+  resetsAt?: string | null;
 }
 
 export interface PlanInfo {
@@ -85,6 +102,8 @@ export interface PlanInfo {
   status: string;
   renewsAt?: string | null;
   amountUsd?: number | null;
+  /** Percentage windows exposed by subscription plans (OpenCode Go). */
+  windows?: PlanUsageWindow[];
 }
 
 export interface UsageRange {

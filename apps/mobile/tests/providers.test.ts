@@ -75,18 +75,28 @@ CREATE TABLE provider_snapshot (
 );
 `;
 
-describe('provider registry (M7.2)', () => {
-  it('registers OpenRouter as enabled and Zen as capability-gated', () => {
+describe('provider registry (M7.2 / M8)', () => {
+  it('registers OpenRouter, OpenCode Go and OpenCode Zen with capability gates', () => {
     const openrouter = getDescriptor('openrouter');
     expect(openrouter.enabled).toBe(true);
     expect(openrouter.capabilities.activityHistory).toBe(true);
     expect(openrouter.supportsManagementKey).toBe(true);
 
+    const go = getDescriptor('opencode-go');
+    expect(go.enabled).toBe(true);
+    expect(go.capabilities.subscriptionPlan).toBe(true);
+    expect(go.capabilities.planWindows).toBe(true);
+    expect(go.capabilities.activityHistory).toBe(false);
+
     const zen = getDescriptor('opencode-zen');
-    expect(zen.enabled).toBe(false);
+    expect(zen.enabled).toBe(true);
     expect(zen.capabilities.manualBudget).toBe(true);
     expect(zen.capabilities.activityHistory).toBe(false);
-    expect(listDescriptors().map((d) => d.id)).toEqual(['openrouter']);
+    expect(listDescriptors().map((d) => d.id)).toEqual([
+      'openrouter',
+      'opencode-go',
+      'opencode-zen',
+    ]);
   });
 });
 

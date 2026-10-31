@@ -2,6 +2,29 @@
 
 ![OpenRator v0.2 release banner](assets/release-banner.png)
 
+## [Unreleased] — M8 OpenCode Go + Zen integration (v0.2)
+
+### Added
+- **M8.1–M8.2** OpenCode Go (`opencode-go`) and OpenCode Zen (`opencode-zen`)
+  descriptors with a documented capability matrix. Go exposes subscription
+  percentage windows (5 h / weekly / monthly); Zen is pay-as-you-go reported in
+  microcents. Live transport remains gated until a real spike captures the API.
+- **M8.3** Fixture-backed adapters: `OpenCodeGoAdapter` maps plan windows and
+  clamps percentages; `OpenCodeZenAdapter` converts `MICROCENTS_PER_USD`
+  (100,000,000) to USD before the value reaches SQLite or a screen.
+- **M8.4** Capability-driven UI: Home renders a plan-window card (percent bars
+  with warn/danger thresholds) and hides the credits card when no balance API is
+  available; Spend shows an explainer + key windows for history-less providers;
+  Keys/Policy keep their existing explainer gates.
+- **M8.5** Manual fallback: `usage_manual` DAO (upsert/get/list/delete) plus an
+  Accounts → **Manual tracking** card for month amount, Go plan name, and the
+  three percentage windows. Every surface labels these values `user-entered`.
+- **M8.7** Secrets guard now allows `openrouter.ai`, `stats.openrouter.ai`, and
+  `opencode.ai` only.
+- [`docs/05-provider-integrations.md`](05-provider-integrations.md) with units,
+  capability matrix, manual fallback rules, and the M8.1 capture checklist.
+- 8 new tests (`tests/opencode-providers.test.ts`); suite at 152 tests.
+
 ## [Unreleased] — M7 multi-provider core (v0.2)
 
 ### Added

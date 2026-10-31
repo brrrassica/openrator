@@ -5,7 +5,8 @@
 ![OpenRator — one pane for every AI bill](docs/assets/social-preview.png)
 
 Single-pane-of-glass Android app for your **AI spend** — starting with
-**OpenRouter**, expanding to **OpenCode Zen** in v0.2. Credits at a glance, spend
+**OpenRouter**, expanding to **OpenCode Go** (subscription % windows) and
+**OpenCode Zen** (pay-as-you-go, microcents) in v0.2. Credits at a glance, spend
 & endpoint analytics, upstream provider policy controls, and API key oversight —
 built with Expo / React Native, BYOK on-device (no backend).
 
@@ -39,6 +40,7 @@ Release runbook: `docs/04-qa-checklist.md` §4. Physical-device-only items
 - [`docs/01-specification.md`](docs/01-specification.md) — product spec, verified API surface, architecture, decisions
 - [`docs/02-roadmap-v0.1.md`](docs/02-roadmap-v0.1.md) — v0.1 roadmap (M0–M5), effort, exit criteria
 - [`docs/03-spike-notes.md`](docs/03-spike-notes.md) — live API spike results (2026-10-05)
+- [`docs/05-provider-integrations.md`](docs/05-provider-integrations.md) — OpenCode Go/Zen units, capability matrix, manual fallback
 - [`docs/04-ci-notes.md`](docs/04-ci-notes.md) — CI setup & ops notes (GitHub Actions + self-hosted Gitea/act_runner)
 - [`docs/04-qa-checklist.md`](docs/04-qa-checklist.md) — v0.1 acceptance + device matrix (M5)
 - [`docs/06-brand-guide.md`](docs/06-brand-guide.md) — mark, palette, typography, icon grid, asset pipeline

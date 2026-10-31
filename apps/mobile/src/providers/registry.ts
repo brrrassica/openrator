@@ -15,6 +15,14 @@ import {
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const OPENROUTER_DASHBOARD_URL = 'https://openrouter.ai/settings';
 
+/**
+ * OpenCode exposes two products under one host. Transport details are gated
+ * until the M8.1 live spike; both descriptors ship enabled so the manual
+ * fallback and capability explainers can be used today.
+ */
+const OPENCODE_BASE_URL = 'https://opencode.ai';
+const OPENCODE_DASHBOARD_URL = 'https://opencode.ai';
+
 const OPENROUTER_CAPS: ProviderCapabilities = {
   accountBalance: true,
   spendWindows: true,
@@ -23,12 +31,30 @@ const OPENROUTER_CAPS: ProviderCapabilities = {
   providerCatalog: true,
   routingPolicy: true,
   subscriptionPlan: false,
+  planWindows: false,
   manualBudget: false,
 };
 
 /**
- * OpenCode Zen is registered from day one but stays disabled until the M8
- * live spike verifies transport, balance and usage endpoints.
+ * OpenCode Go — subscription plan. Usage is expressed as a percentage of the
+ * allowance over rolling 5-hour, weekly and monthly windows.
+ */
+const GO_CAPS: ProviderCapabilities = {
+  accountBalance: false,
+  spendWindows: false,
+  activityHistory: false,
+  keyManagement: false,
+  providerCatalog: false,
+  routingPolicy: false,
+  subscriptionPlan: true,
+  planWindows: true,
+  manualBudget: true,
+};
+
+/**
+ * OpenCode Zen — pay-as-you-go balance reported in microcents. Balance and
+ * spend endpoints stay off in the descriptor until M8.1 verifies them, so the
+ * app never renders a fabricated $0.00; the manual-budget fallback covers it.
  */
 const ZEN_CAPS: ProviderCapabilities = {
   accountBalance: false,
@@ -38,6 +64,7 @@ const ZEN_CAPS: ProviderCapabilities = {
   providerCatalog: false,
   routingPolicy: false,
   subscriptionPlan: false,
+  planWindows: false,
   manualBudget: true,
 };
 
@@ -56,19 +83,34 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderId, ProviderDescriptor> = {
     enabled: true,
     brandKey: 'openrouter',
   },
+  'opencode-go': {
+    id: 'opencode-go',
+    displayName: 'OpenCode Go',
+    shortName: 'Go',
+    // M8.1: base URL/auth are unverified; no live calls are made from this.
+    baseUrl: OPENCODE_BASE_URL,
+    dashboardUrl: OPENCODE_DASHBOARD_URL,
+    docsUrl: 'https://opencode.ai/docs',
+    keyPattern: /^[A-Za-z0-9._-]{16,}$/,
+    keyHint: 'Paste the key issued by OpenCode Go.',
+    capabilities: GO_CAPS,
+    supportsManagementKey: false,
+    enabled: true,
+    brandKey: 'opencode-go',
+  },
   'opencode-zen': {
     id: 'opencode-zen',
     displayName: 'OpenCode Zen',
     shortName: 'Zen',
-    // Verified in M8.1; intentionally empty until then (no unverified calls).
-    baseUrl: '',
-    dashboardUrl: '',
-    docsUrl: '',
+    // M8.1: base URL/auth are unverified; no live calls are made from this.
+    baseUrl: OPENCODE_BASE_URL,
+    dashboardUrl: OPENCODE_DASHBOARD_URL,
+    docsUrl: 'https://opencode.ai/docs',
     keyPattern: /^[A-Za-z0-9._-]{16,}$/,
     keyHint: 'Paste the key issued by OpenCode Zen.',
     capabilities: ZEN_CAPS,
     supportsManagementKey: false,
-    enabled: false,
+    enabled: true,
     brandKey: 'opencode-zen',
   },
 };
