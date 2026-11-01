@@ -1,0 +1,41 @@
+# OpenRator v0.2.1 — release notes
+
+![OpenRator horizontal lockup](assets/lockup-horizontal.png)
+
+**Status:** source release 2026-11-01 (`docs/release.json` `status: "source"`).
+**Version:** `0.2.1` · **versionCode:** `4` · **package:** `tech.alatcerdas.openrator`.
+**Scope:** Android only, private APK (BYOK, no accounts, no analytics SDK).
+
+## What changed
+
+### OpenCode Go live sync
+- v0.2.0 shipped OpenCode Go with percentage windows entered by hand because the
+  adapter was fixture-only. That was a release gap.
+- `OpenCodeGoAdapter` now calls the verified endpoint:
+
+  ```http
+  GET https://opencode.ai/zen/go/v1/usage
+  Authorization: Bearer oc_sk_...
+  ```
+
+- The response’s `rolling`, `weekly`, and `monthly` meters map to the 5-hour,
+  weekly, and monthly plan windows. `resetsAt` is normalized to ISO-8601 and a
+  `rate-limited` meter marks the plan as `limited`.
+- The Accounts pane no longer asks for Go percentages. The manual card records
+  only an optional monthly dollar amount.
+- OpenCode Zen keeps the manual fallback until its balance endpoint is verified.
+
+## Verification
+
+- `npm run typecheck` clean.
+- Full unit suite: 21 files / 224 tests passed.
+- A transient live integration test through `OpenCodeClient` fetched the real
+  Go endpoint successfully; the temporary test file was removed and no key is
+  committed.
+
+## Next steps
+
+1. Build the v0.2.1 APK and set `status: "artifact"` plus the build id, commit,
+   SHA-256, APK URL, and byte count in [`release.json`](release.json).
+2. Run the two-device pass via `npm run evidence:init`; complete the 72 h soak.
+3. Attach the rendered device evidence to the release record.

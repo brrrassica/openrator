@@ -38,13 +38,24 @@
   `ubuntu-24.04-jdk-17-ndk-r27b` image, and use `appVersionSource: "local"` so
   the tag's `versionCode` (3) is the versionCode embedded in the APK.
 
-## [Unreleased] — M8 OpenCode Go + Zen integration (v0.2)
+## [0.2.1] — 2026-11-01 — OpenCode Go live sync
+
+### Fixed
+- OpenCode Go percentage windows now sync from the verified live API instead of
+  requiring manual entry. The v0.2.0 artifact shipped the fixture-only adapter,
+  which was the release gap this patch closes.
 
 ### Added
-- **M8.1–M8.2** OpenCode Go (`opencode-go`) and OpenCode Zen (`opencode-zen`)
+- **M8.1** OpenCode Go live transport: `OpenCodeGoAdapter` now calls
+  `GET https://opencode.ai/zen/go/v1/usage` with the API key and maps
+  `rolling`/`weekly`/`monthly` percentages plus `resetsAt` into plan windows.
+  No workspace header is required; a `rate-limited` meter marks the plan
+  `limited`.
+- **M8.2** OpenCode Go (`opencode-go`) and OpenCode Zen (`opencode-zen`)
   descriptors with a documented capability matrix. Go exposes subscription
   percentage windows (5 h / weekly / monthly); Zen is pay-as-you-go reported in
-  microcents. Live transport remains gated until a real spike captures the API.
+  microcents and still uses the manual fallback until its balance endpoint is
+  verified.
 - **M8.3** Fixture-backed adapters: `OpenCodeGoAdapter` maps plan windows and
   clamps percentages; `OpenCodeZenAdapter` converts `MICROCENTS_PER_USD`
   (100,000,000) to USD before the value reaches SQLite or a screen.
@@ -60,6 +71,12 @@
 - [`docs/05-provider-integrations.md`](05-provider-integrations.md) with units,
   capability matrix, manual fallback rules, and the M8.1 capture checklist.
 - 8 new tests (`tests/opencode-providers.test.ts`); suite at 152 tests.
+
+### Changed
+- Accounts no longer asks for OpenCode Go percentage windows. The manual card
+  for Go now records only the optional monthly dollar amount; percentages sync
+  from the API. Tests cover URL/auth headers, window mapping, clamping,
+  `rate-limited`, defensive parsing, and 401 propagation.
 
 ## [Unreleased] — M7 multi-provider core (v0.2)
 

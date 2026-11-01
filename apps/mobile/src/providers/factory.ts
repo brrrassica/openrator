@@ -19,10 +19,10 @@ export function createAdapter(
     case 'openrouter':
       return createOpenRouterAdapter(() => creds.getCredential('openrouter'));
     case 'opencode-go':
-      // Live transport is gated until M8.1; tests inject fixtures directly.
+      // Live: GET https://opencode.ai/zen/go/v1/usage (M8.1 verified).
       return new OpenCodeGoAdapter();
     case 'opencode-zen':
-      // Live transport is gated until M8.1; tests inject fixtures directly.
+      // Zen balance transport is still unverified; manual fallback applies.
       return new OpenCodeZenAdapter();
   }
 }

@@ -16,9 +16,9 @@ const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const OPENROUTER_DASHBOARD_URL = 'https://openrouter.ai/settings';
 
 /**
- * OpenCode exposes two products under one host. Transport details are gated
- * until the M8.1 live spike; both descriptors ship enabled so the manual
- * fallback and capability explainers can be used today.
+ * OpenCode exposes two products under one host. Go's percentage endpoint is
+ * verified (M8.1); Zen's balance endpoint is still unverified, so Zen keeps
+ * the manual-budget fallback. Both descriptors ship enabled.
  */
 const OPENCODE_BASE_URL = 'https://opencode.ai';
 const OPENCODE_DASHBOARD_URL = 'https://opencode.ai';
@@ -53,8 +53,9 @@ const GO_CAPS: ProviderCapabilities = {
 
 /**
  * OpenCode Zen — pay-as-you-go balance reported in microcents. Balance and
- * spend endpoints stay off in the descriptor until M8.1 verifies them, so the
- * app never renders a fabricated $0.00; the manual-budget fallback covers it.
+ * spend endpoints stay off in the descriptor until their live contract is
+ * verified, so the app never renders a fabricated $0.00; the manual-budget
+ * fallback covers it.
  */
 const ZEN_CAPS: ProviderCapabilities = {
   accountBalance: false,
@@ -87,12 +88,12 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderId, ProviderDescriptor> = {
     id: 'opencode-go',
     displayName: 'OpenCode Go',
     shortName: 'Go',
-    // M8.1: base URL/auth are unverified; no live calls are made from this.
+    // M8.1 verified: GET /zen/go/v1/usage with a Bearer API key.
     baseUrl: OPENCODE_BASE_URL,
     dashboardUrl: OPENCODE_DASHBOARD_URL,
     docsUrl: 'https://opencode.ai/docs',
     keyPattern: /^[A-Za-z0-9._-]{16,}$/,
-    keyHint: 'Paste the key issued by OpenCode Go.',
+    keyHint: 'Keys start with oc_sk_ and are issued by the OpenCode Console.',
     capabilities: GO_CAPS,
     supportsManagementKey: false,
     enabled: true,

@@ -196,22 +196,22 @@
       "automated": true,
       "deviceRequired": true,
       "status": "yellow",
-      "evidence": "manifests (package/app/eas) + docs/release.json agree with the CHANGELOG; sideload + crash-free soak remain device-only",
+      "evidence": "source-only v0.2.1 tag: manifests (package/app/eas), versionCode 4, and CHANGELOG agree; APK build + sideload + soak remain device-only",
       "assertions": [
         {
           "name": "package.json and app.json versions agree",
           "ok": true,
-          "detail": "0.2.0 / 0.2.0 / release 0.2.0"
+          "detail": "0.2.1 / 0.2.1 / release 0.2.1"
         },
         {
           "name": "release version is semver",
           "ok": true,
-          "detail": "0.2.0"
+          "detail": "0.2.1"
         },
         {
           "name": "android versionCode is a positive integer and matches the release record",
           "ok": true,
-          "detail": "3 / release 3"
+          "detail": "4 / release 4"
         },
         {
           "name": "EAS production profile builds an internal APK",
@@ -221,17 +221,12 @@
         {
           "name": "CHANGELOG records the released version",
           "ok": true,
-          "detail": "## [0.2.0]"
+          "detail": "## [0.2.1]"
         },
         {
-          "name": "APK SHA-256 is 64 lowercase hex characters",
+          "name": "source-only release records no fabricated APK identity",
           "ok": true,
-          "detail": "07eb8e9c5d7e"
-        },
-        {
-          "name": "APK build id and commit are recorded",
-          "ok": true,
-          "detail": "ec4f08f0-1861-4980-b531-d58399b92f9d / 81054c31002c4bc539566fb45661a08ffc171b14"
+          "detail": "APK identity pending build"
         }
       ]
     }

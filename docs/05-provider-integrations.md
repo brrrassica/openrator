@@ -4,11 +4,11 @@ Grounding: [`plans/v0.2.0-plan.md`](../plans/v0.2.0-plan.md) §5 (M8),
 [`providers/registry.ts`](../apps/mobile/src/providers/registry.ts), and
 [`providers/types.ts`](../apps/mobile/src/providers/types.ts).
 
-> **Status: fixture-backed / provisional.** M8.1 (live OpenCode spike) has not
-> been executed yet because no OpenCode Go/Zen key and endpoint capture were
-> available. No live OpenCode call is made. The adapters accept fixtures in
-> tests; the app ships the capability gates plus a clearly-labeled manual
-> fallback. Nothing in this document claims an API exists.
+> **Status: OpenCode Go live; Zen provisional.** The Go allowance endpoint was
+> captured and verified on 2026-11-01 with a real key, so OpenCode Go now syncs
+> its percentage windows automatically. OpenCode Zen still ships fixture-backed
+> behind a manual fallback until its balance endpoint is verified. Adapters
+> accept fixtures for contract tests.
 
 ## Products and accounting units
 
@@ -24,6 +24,32 @@ defined once in [`providers/opencode/common.ts`](../apps/mobile/src/providers/op
 Adapters convert to USD before the value reaches SQLite or a screen, so the
 domain model only carries USD. If the spike shows a different wire unit, change
 that constant and its tests only.
+
+### Live transport (OpenCode Go, verified)
+
+```http
+GET https://opencode.ai/zen/go/v1/usage
+Authorization: Bearer oc_sk_...
+Accept: application/json
+```
+
+Authentication is the API key alone; no workspace/org header is required. The
+response reports every rolling window as a percentage of the plan allowance:
+
+```json
+{
+  "usage": {
+    "rolling": { "status": "ok", "percent": 2, "resetsAt": "2026-11-01T09:18:48.000Z" },
+    "weekly":  { "status": "ok", "percent": 13, "resetsAt": "2026-11-02T00:00:00.000Z" },
+    "monthly": { "status": "ok", "percent": 6, "resetsAt": "2026-11-30T02:22:37.000Z" }
+  }
+}
+```
+
+`rolling` maps to `five_hour`. `status` is `ok` or `rate-limited`; any non-`ok`
+meter sets the plan status to `limited`. `resetsAt` is ISO-8601. The adapter
+clamps percentages to `0..100` and degrades to zero/empty values if the shape
+changes. See [`providers/opencode/client.ts`](../apps/mobile/src/providers/opencode/client.ts).
 
 ### Plan windows
 
@@ -64,6 +90,9 @@ Rules enforced by the UI:
 
 ## Manual fallback (M8.5)
 
+For OpenCode Go the percentage windows are **API-derived**; they are no longer
+entered by hand. The manual card only records an optional monthly dollar amount.
+
 The `usage_manual` table (schema v4) stores one `(provider, month)` amount in
 USD with a `note`. Accounts → **Manual tracking** writes it and, for Go, the
 plan name plus the three percentage windows. Every surface labels these values
@@ -77,11 +106,10 @@ plan name plus the three percentage windows. Every surface labels these values
   `provider.<id>.key`; fixtures and tests use obvious non-secret literals.
 - No raw key is written to SQLite, logs, notifications, or settings.
 
-## M8.1 checklist (when a real key is available)
+## M8.1 checklist
 
-1. Capture base URL, auth header, key prefix/format.
-2. Capture the Go plan response: window names, reset semantics, percent scale.
-3. Capture the Zen balance/usage response and confirm the microcent divisor.
-4. Confirm rate limits and error bodies; extend the error taxonomy if needed.
-5. Replace provisional fixtures, enable `accountBalance`/`spendWindows` for Zen,
-   and update this matrix.
+1. ✅ Capture base URL, auth header, key prefix/format.
+2. ✅ Capture the Go plan response: window names, reset semantics, percent scale.
+3. ⬜ Capture the Zen balance/usage response and confirm the microcent divisor.
+4. ⬜ Confirm Zen rate limits and error bodies; extend the error taxonomy if needed.
+5. ⬜ Enable `accountBalance`/`spendWindows` for Zen and update this matrix.

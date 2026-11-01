@@ -513,7 +513,7 @@ function checkBuildInstall(f: AcceptanceFixtures): AcceptanceCheck {
       automated: assertions.every((a) => a.ok),
       deviceRequired: true,
       evidence: sourceOnly
-        ? 'source-only v0.2.0 tag: manifests (package/app/eas), versionCode 3, and CHANGELOG agree; APK build + sideload + soak remain device-only'
+        ? `source-only v${version} tag: manifests (package/app/eas), versionCode ${build.androidVersionCode}, and CHANGELOG agree; APK build + sideload + soak remain device-only`
         : 'manifests (package/app/eas) + docs/release.json agree with the CHANGELOG; sideload + crash-free soak remain device-only',
     },
     assertions,

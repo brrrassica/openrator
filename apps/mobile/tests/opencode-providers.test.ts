@@ -5,6 +5,7 @@ import {
   planSettingSuffix,
   planWindowSettingEntries,
 } from '../src/core/plan';
+import { FetchLike } from '../src/core/http';
 import { CredentialService, MemoryKeyValueStore } from '../src/core/credentials';
 import {
   getManualUsage,
@@ -21,6 +22,11 @@ import {
   microcentsToUsd,
   usdToMicrocents,
 } from '../src/providers/opencode/common';
+import {
+  isGoUsageLimited,
+  normalizeResetsAt,
+  parseGoUsage,
+} from '../src/providers/opencode/client';
 import { SyncEngine } from '../src/sync/sync-engine';
 import { NodeSqlite } from './helpers/sqlite-node';
 
@@ -59,15 +65,75 @@ describe('OpenCode Go adapter (M8)', () => {
     ]);
   });
 
-  it('refuses to fabricate an account when no fixture is present', async () => {
-    const adapter = new OpenCodeGoAdapter();
+  it('fetches the live Go allowance endpoint and maps rolling/weekly/monthly', async () => {
+    let seenUrl = '';
+    let seenHeaders: Record<string, unknown> = {};
+    const fetchFn: FetchLike = async (url, init) => {
+      seenUrl = url;
+      seenHeaders = (init?.headers ?? {}) as Record<string, unknown>;
+      return {
+        status: 200,
+        headers: { get: () => null },
+        json: async () => ({
+          usage: {
+            rolling: { status: 'ok', percent: 2, resetsAt: '2026-11-01T09:18:48.000Z' },
+            weekly: { status: 'ok', percent: 13, resetsAt: '2026-11-02T00:00:00.000Z' },
+            monthly: {
+              status: 'rate-limited',
+              percent: 106,
+              resetsAt: '2026-11-30T02:22:37.000Z',
+            },
+          },
+        }),
+      };
+    };
+
+    const adapter = new OpenCodeGoAdapter({}, { fetchFn });
+    const account = await adapter.getAccount({
+      provider: 'opencode-go',
+      key: 'go-live-key-0123456789',
+      isManagement: false,
+    });
+
+    expect(seenUrl).toBe('https://opencode.ai/zen/go/v1/usage');
+    expect(seenHeaders.Authorization).toBe('Bearer go-live-key-0123456789');
+    expect(account.planWindows).toEqual([
+      { window: 'five_hour', usedPct: 2, resetsAt: '2026-11-01T09:18:48.000Z' },
+      { window: 'weekly', usedPct: 13, resetsAt: '2026-11-02T00:00:00.000Z' },
+      { window: 'monthly', usedPct: 100, resetsAt: '2026-11-30T02:22:37.000Z' },
+    ]);
+    expect(account.plan?.status).toBe('limited');
+    expect(account.plan?.renewsAt).toBe('2026-11-30T02:22:37.000Z');
+  });
+
+  it('surfaces a 401 from the live endpoint as an invalid-key error', async () => {
+    const fetchFn: FetchLike = async () => ({
+      status: 401,
+      headers: { get: () => null },
+      json: async () => ({ type: 'error', error: { type: 'AuthError', message: 'Unauthorized' } }),
+    });
+    const adapter = new OpenCodeGoAdapter({}, { fetchFn });
     await expect(
       adapter.getAccount({
         provider: 'opencode-go',
-        key: 'go-fixture-key-0123456789',
+        key: 'go-live-key-0123456789',
         isManagement: false,
       }),
-    ).rejects.toThrow(/not verified/);
+    ).rejects.toThrow(/Unauthorized/);
+  });
+
+  it('parses defensively when the wire shape changes', () => {
+    expect(parseGoUsage(null)).toEqual([]);
+    expect(parseGoUsage({ usage: null })).toEqual([]);
+    expect(
+      parseGoUsage({
+        usage: { rolling: { percent: Number.NaN, resetsAt: 'not-a-date' } },
+      }),
+    ).toEqual([{ window: 'five_hour', usedPct: 0, resetsAt: null }]);
+    expect(normalizeResetsAt('not-a-date')).toBeNull();
+    expect(normalizeResetsAt('2026-11-01T09:18:48.000Z')).toBe('2026-11-01T09:18:48.000Z');
+    expect(isGoUsageLimited({ usage: { weekly: { status: 'rate-limited' } } })).toBe(true);
+    expect(isGoUsageLimited({ usage: { weekly: { status: 'ok' } } })).toBe(false);
   });
 });
 

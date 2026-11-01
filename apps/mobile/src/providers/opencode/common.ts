@@ -6,9 +6,9 @@
  *    allowance over rolling 5-hour, weekly and monthly windows.
  *  - OpenCode Zen: pay-as-you-go balance reported in microcents.
  *
- * The wire formats are provisional until the M8.1 live spike. These helpers
- * keep the conversion rules in one unit-tested place so adapters and fixtures
- * cannot drift.
+ * Go's live wire format is verified (see ./client.ts). Zen's balance format is
+ * still provisional. These helpers keep the conversion rules in one
+ * unit-tested place so adapters and fixtures cannot drift.
  */
 
 /**

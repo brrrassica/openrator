@@ -5,8 +5,8 @@
 ![OpenRator — one pane for every AI bill](docs/assets/social-preview.png)
 
 Single-pane-of-glass Android app for your **AI spend** — starting with
-**OpenRouter**, expanding to **OpenCode Go** (subscription % windows) and
-**OpenCode Zen** (pay-as-you-go, microcents) in v0.2. Credits at a glance, spend
+**OpenRouter**, expanding to **OpenCode Go** (subscription % windows, live API)
+and **OpenCode Zen** (pay-as-you-go, microcents) in v0.2. Credits at a glance, spend
 & endpoint analytics, upstream provider policy controls, and API key oversight —
 built with Expo / React Native, BYOK on-device (no backend).
 
@@ -14,7 +14,7 @@ built with Expo / React Native, BYOK on-device (no backend).
 
 ## Status
 
-- **v0.2.0 🚧** Multi-provider core, brand refresh, and local alerts — plan in [`plans/v0.2.0-plan.md`](plans/v0.2.0-plan.md). Brand workstream (M6) is in progress.
+- **v0.2.1 🚧** Multi-provider core, brand refresh, local alerts, and live OpenCode Go percentage sync — plan in [`plans/v0.2.0-plan.md`](plans/v0.2.0-plan.md). Brand workstream (M6) is in progress.
 - **M0 ✅** Foundation & API spikes — verified live 2026-10-05 (`docs/03-spike-notes.md`). Generation-list spike **pivoted the product to Spend & Endpoint analytics** (D7).
 - **M1 ✅** Data & client layer — secure-store credentials, typed API client, sync engine, SQLite DAOs, rollups.
 - **M2 ✅** Home Pane — themed shell, custom SVG charts, credits card, 14-day spend trend, health strip, pull-to-refresh.
@@ -40,12 +40,14 @@ Release runbook: `docs/04-qa-checklist.md` §4. Physical-device-only items
 - [`docs/01-specification.md`](docs/01-specification.md) — product spec, verified API surface, architecture, decisions
 - [`docs/02-roadmap-v0.1.md`](docs/02-roadmap-v0.1.md) — v0.1 roadmap (M0–M5), effort, exit criteria
 - [`docs/03-spike-notes.md`](docs/03-spike-notes.md) — live API spike results (2026-10-05)
-- [`docs/05-provider-integrations.md`](docs/05-provider-integrations.md) — OpenCode Go/Zen units, capability matrix, manual fallback
+- [`docs/05-provider-integrations.md`](docs/05-provider-integrations.md) — OpenCode Go live transport, Zen units, capability matrix, manual fallback
 - [`docs/04-ci-notes.md`](docs/04-ci-notes.md) — CI setup & ops notes (GitHub Actions + self-hosted Gitea/act_runner)
 - [`docs/04-qa-checklist.md`](docs/04-qa-checklist.md) — v0.1 acceptance + device matrix (M5)
 - [`docs/06-brand-guide.md`](docs/06-brand-guide.md) — mark, palette, typography, icon grid, asset pipeline
 - [`docs/assets/README.md`](docs/assets/README.md) — index and previews of every generated brand asset
 - [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — changelog
+- [`docs/RELEASE-NOTES-v0.2.1.md`](docs/RELEASE-NOTES-v0.2.1.md) — v0.2.1 release notes
+- [`docs/RELEASE-NOTES-v0.2.0.md`](docs/RELEASE-NOTES-v0.2.0.md) — v0.2.0 release notes
 - [`docs/RELEASE-NOTES-v0.1.0.md`](docs/RELEASE-NOTES-v0.1.0.md) — v0.1.0 release notes
 
 ## Development

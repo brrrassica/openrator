@@ -24,7 +24,7 @@ const facts = (overrides: Partial<ReleaseFacts> = {}): ReleaseFacts => ({
 describe('release readiness (real repository state)', () => {
   const report = evaluateReleaseReadiness(RELEASE_FACTS);
 
-  it('passes on the committed v0.2.0 source release', () => {
+  it('passes on the committed v0.2.1 source release', () => {
     const failed = report.findings.filter((f) => !f.ok);
     expect(failed, failed.map((f) => `${f.name} (${f.detail})`).join('; ')).toEqual([]);
     expect(report.ok).toBe(true);
