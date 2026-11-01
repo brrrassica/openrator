@@ -6,20 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0B1220"
-    },
-    "notification": {
-      "icon": "./assets/notification-icon.png",
-      "color": "#0A74D8"
-    },
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "ai.openrator.app",
+      "package": "tech.alatcerdas.openrator",
       "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#0A74D8",

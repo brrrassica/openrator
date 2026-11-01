@@ -1,14 +1,16 @@
 {
   "cli": {
     "version": ">= 5.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "production": {
       "channel": "production",
+      "node": "22.14.0",
       "android": {
         "buildType": "apk",
-        "distribution": "internal"
+        "distribution": "internal",
+        "image": "ubuntu-24.04-jdk-17-ndk-r27b"
       }
     }
   }

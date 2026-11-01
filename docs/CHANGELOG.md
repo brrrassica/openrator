@@ -30,6 +30,13 @@
   last `package` value (`com.anonymous.openrator`) silently overrode the
   intended `ai.openrator.app`. Duplicates removed; the new gate catches any
   recurrence.
+- Restored the F-Droid app id `tech.alatcerdas.openrator` (v0.2.0 had reverted
+  to `ai.openrator.app`, which blocked upgrades from v0.1.1).
+- Removed the unsupported top-level `splash` and `notification` app-config
+  properties so `expo prebuild` can generate the Android project on SDK 57.
+- EAS production builds now pin Node `22.14.0` and the
+  `ubuntu-24.04-jdk-17-ndk-r27b` image, and use `appVersionSource: "local"` so
+  the tag's `versionCode` (3) is the versionCode embedded in the APK.
 
 ## [Unreleased] — M8 OpenCode Go + Zen integration (v0.2)
 
