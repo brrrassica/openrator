@@ -65,7 +65,8 @@ master. CI should run it on every push.
 | Lockup | File | Use |
 |---|---|---|
 | Horizontal | [`brand/svg/lockup-horizontal.svg`](../brand/svg/lockup-horizontal.svg) | README, social, docs headers |
-| Stacked | [`brand/svg/lockup-stacked.svg`](../brand/svg/lockup-stacked.svg) | Splash, release art, square placements |
+| Stacked | [`brand/svg/lockup-stacked.svg`](../brand/svg/lockup-stacked.svg) | Release art, square placements |
+| Splash | [`brand/svg/splash-screen.svg`](../brand/svg/splash-screen.svg) | App launch screen (`assets/splash-screen.png`) |
 | Wordmark only | [`brand/svg/wordmark.svg`](../brand/svg/wordmark.svg) | Narrow spaces; never smaller than 96 px wide |
 | Social preview | [`brand/svg/social-preview.svg`](../brand/svg/social-preview.svg) | Gitea/GitHub link preview, release banner |
 

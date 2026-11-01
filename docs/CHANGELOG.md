@@ -40,6 +40,16 @@
 
 ## [0.2.1] — 2026-11-01 — OpenCode Go live sync
 
+### Added
+- Branded launch screen generated from [`brand/svg/splash-screen.svg`](../brand/svg/splash-screen.svg)
+  through the deterministic asset pipeline. `expo-splash-screen` now uses the
+  OpenRator mark, wordmark, and tagline on the brand-blue (or ink in dark mode)
+  background instead of the Expo scaffold.
+- The top-level [`README.md`](../README.md) is now written for users only.
+  Development setup, quality gates, release steps, and the documentation index
+  moved to [`docs/07-development.md`](07-development.md) and
+  [`docs/README.md`](README.md).
+
 ### Fixed
 - OpenCode Go percentage windows now sync from the verified live API instead of
   requiring manual entry. The v0.2.0 artifact shipped the fixture-only adapter,

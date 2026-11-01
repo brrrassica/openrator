@@ -1,66 +1,64 @@
 # OpenRator
 
-[![CI](https://github.com/brrrassica/openrator/actions/workflows/ci.yml/badge.svg)](https://github.com/brrrassica/openrator/actions)
-
 ![OpenRator — one pane for every AI bill](docs/assets/social-preview.png)
 
-Single-pane-of-glass Android app for your **AI spend** — starting with
-**OpenRouter**, expanding to **OpenCode Go** (subscription % windows, live API)
-and **OpenCode Zen** (pay-as-you-go, microcents) in v0.2. Credits at a glance, spend
-& endpoint analytics, upstream provider policy controls, and API key oversight —
-built with Expo / React Native, BYOK on-device (no backend).
+**One pane for every AI bill.** OpenRator is an Android dashboard for the AI
+providers you already use. See your credits, spend, usage windows, provider
+policy, and API keys without opening a laptop.
 
-*The name: OpenRouter + Operator.* (I know it sucks)
+Bring your own API key (BYOK). No account, no backend, no telemetry — your key
+and your usage data stay on your phone.
 
-## Status
+## What you can do
 
-- **v0.2.1 🚧** Multi-provider core, brand refresh, local alerts, and live OpenCode Go percentage sync — plan in [`plans/v0.2.0-plan.md`](plans/v0.2.0-plan.md). Brand workstream (M6) is in progress.
-- **M0 ✅** Foundation & API spikes — verified live 2026-10-05 (`docs/03-spike-notes.md`). Generation-list spike **pivoted the product to Spend & Endpoint analytics** (D7).
-- **M1 ✅** Data & client layer — secure-store credentials, typed API client, sync engine, SQLite DAOs, rollups.
-- **M2 ✅** Home Pane — themed shell, custom SVG charts, credits card, 14-day spend trend, health strip, pull-to-refresh.
-- **M3 ✅** Spend & Endpoint analytics (30-day area chart, endpoint/provider breakdowns, no-mgmt fallback).
-- **M4 ✅** Provider Policy & Keys — catalog, preset routing editor with optimistic writes, mgmt-key CRUD + create/reveal flow.
-- **M5 ✅** Hardening, QA, release — secrets guard + engine E2E, a11y/theming pass, and a **production APK built via EAS** (build `e6e1199a…`, commit `805ac83`). Device sideload + 72 h soak remain (physical-device-only; `docs/04-qa-checklist.md`).
+- **See your balance at a glance.** Credits remaining, key limits, reset
+  windows, and a 14-day spend trend on one home screen.
+- **Understand where the money goes.** A 30-day spend chart plus breakdowns by
+  endpoint, model, and provider, so an expensive agent or model is easy to spot.
+- **Track subscription windows.** OpenCode Go's 5-hour, weekly, and monthly
+  percentage windows are pulled live, with clear warning and danger thresholds.
+- **Keep provider policy under control.** Browse the provider catalog and adjust
+  routing rules from your phone.
+- **Oversee your API keys.** List keys, check limits, and edit labels, limits, or
+  reset windows.
+- **Work across providers.** OpenRouter today, with OpenCode Go and OpenCode Zen
+  available in the same app.
 
-## Release (v0.1)
+## Supported providers
 
-Version `0.1.0` builds via `eas build -p android --profile production` (production
-channel, Android APK for sideload — no store listing in v0.1). The current artifact
-was built 2026-10-07:
+| Provider | What OpenRator shows |
+|---|---|
+| **OpenRouter** | Credits, key limits, spend and endpoint analytics, provider policy, API keys |
+| **OpenCode Go** | Live 5-hour / weekly / monthly subscription usage windows |
+| **OpenCode Zen** | Pay-as-you-go usage with optional manual monthly tracking |
 
-- APK: https://expo.dev/artifacts/eas/kDDUS4vG-GEgcIWDhhmyoeA0vkc8WAwAbrrrkeHmR3U.apk
-- SHA-256: `0048671caed2ca7cd69dc8ba7d41080c6a8e41864214ca68f1d7186b41f3500b`
+## Install
 
-Release runbook: `docs/04-qa-checklist.md` §4. Physical-device-only items
-(mgmt-key acceptance, sideload, soak) are tracked there.
+OpenRator requires **Android 12 or newer** and is distributed as a signed APK
+for sideloading.
 
-## Docs
+1. Open the [Releases](https://github.com/brrrassica/openrator/releases) page.
+2. Download the latest `openrator-<version>.apk`.
+3. Open the file on your phone and allow installation from your browser or file
+   manager when Android asks.
 
-- [`plans/v0.2.0-plan.md`](plans/v0.2.0-plan.md) — v0.2.0 multi-provider + brand + alerts plan
-- [`docs/01-specification.md`](docs/01-specification.md) — product spec, verified API surface, architecture, decisions
-- [`docs/02-roadmap-v0.1.md`](docs/02-roadmap-v0.1.md) — v0.1 roadmap (M0–M5), effort, exit criteria
-- [`docs/03-spike-notes.md`](docs/03-spike-notes.md) — live API spike results (2026-10-05)
-- [`docs/05-provider-integrations.md`](docs/05-provider-integrations.md) — OpenCode Go live transport, Zen units, capability matrix, manual fallback
-- [`docs/04-ci-notes.md`](docs/04-ci-notes.md) — CI setup & ops notes (GitHub Actions + self-hosted Gitea/act_runner)
-- [`docs/04-qa-checklist.md`](docs/04-qa-checklist.md) — v0.1 acceptance + device matrix (M5)
-- [`docs/06-brand-guide.md`](docs/06-brand-guide.md) — mark, palette, typography, icon grid, asset pipeline
-- [`docs/assets/README.md`](docs/assets/README.md) — index and previews of every generated brand asset
-- [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — changelog
-- [`docs/RELEASE-NOTES-v0.2.1.md`](docs/RELEASE-NOTES-v0.2.1.md) — v0.2.1 release notes
-- [`docs/RELEASE-NOTES-v0.2.0.md`](docs/RELEASE-NOTES-v0.2.0.md) — v0.2.0 release notes
-- [`docs/RELEASE-NOTES-v0.1.0.md`](docs/RELEASE-NOTES-v0.1.0.md) — v0.1.0 release notes
+OpenRator is not on Google Play. You can verify the download against the
+SHA-256 checksum published with each release.
 
-## Development
+## Your data stays on your phone
 
-```sh
-cd apps/mobile
-npm test            # vitest unit suite
-npm run typecheck   # tsc --noEmit
-npm start           # Expo dev server
-npm run assets:build # regenerate brand PNGs from SVG masters
-npm run assets:check # fail on asset drift (CI)
-```
+- **Your key never leaves the device** except in requests to the provider you
+  configured. It is stored in Android's secure keystore.
+- **No account and no backend.** There is no OpenRator server to sign in to.
+- **No analytics or tracking SDKs.** Nothing is collected or shared.
+- **Direct connections only.** The app talks to the provider APIs you use and
+  nowhere else.
 
-Commits auto-push to the self-hosted mirror via the versioned hook
-(`.githooks/`, enabled with `core.hooksPath`; it targets the `gitea` remote only).
-GitHub is pushed explicitly with `git push github main`.
+## Get help
+
+Found a bug or have a feature request? Open an issue at
+[github.com/brrrassica/openrator/issues](https://github.com/brrrassica/openrator/issues).
+
+## License
+
+OpenRator is released under the [0BSD license](apps/mobile/LICENSE).

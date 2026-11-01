@@ -48,6 +48,12 @@ const JOBS = [
     height: 1024,
   },
   { src: 'svg/splash-mark.svg', out: 'apps/mobile/assets/splash-icon.png', width: 1024, height: 1024 },
+  {
+    src: 'svg/splash-screen.svg',
+    out: 'apps/mobile/assets/splash-screen.png',
+    width: 1200,
+    height: 1200,
+  },
   { src: 'svg/app-icon.svg', out: 'apps/mobile/assets/favicon.png', width: 48, height: 48 },
   {
     src: 'svg/notification-glyph.svg',
