@@ -23,7 +23,7 @@ Users never get an F-Droid-signed APK; they get ours, or nothing (for that versi
 Binaries:
   - https://github.com/brrrassica/openrator/releases/download/v%v/app-release.apk
 AllowedAPKSigningKeys:
-  - b3ccb3f651aee39b5a21ff8ac919ec21d26d28e3bc17e6de892e541f0a067692
+  - 389f40887d99b5947ae467e6120554d2c54afc12103123559bbb26f8c30ae79f
 ```
 
 - `Binaries:` URL uses `%v` (versionName) substitution — matches GitHub Release tag format.
@@ -33,10 +33,10 @@ AllowedAPKSigningKeys:
 
 ### Keystore
 
-- Generated 2026-10-25 on opencode-sam: RSA-4096, alias `openrator`.
+- Managed by EAS Build for `tech.alatcerdas.openrator`; created 2026-11-01.
 - **Never commit the keystore or passwords to git.**
-- Store the keystore in an encrypted backup and the password in a password manager.
-- The keystore fingerprint is: `b3ccb3f651aee39b5a21ff8ac919ec21d26d28e3bc17e6de892e541f0a067692`
+- The EAS-managed keystore signs the published v0.1.1 and v0.2.0 APKs.
+- The signing certificate fingerprint is: `389f40887d99b5947ae467e6120554d2c54afc12103123559bbb26f8c30ae79f`
 
 ### Per-release flow
 

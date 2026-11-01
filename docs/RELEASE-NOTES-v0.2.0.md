@@ -1,17 +1,25 @@
-# OpenRator v0.2.0 — release notes (source-only)
+# OpenRator v0.2.0 — release notes
 
 ![OpenRator horizontal lockup](assets/lockup-horizontal.png)
 
-**Status:** source-only tag (`v0.2.0`). No APK is attached yet.
-**Version:** `0.2.0` · **versionCode:** `3`.
-**Scope:** release-quality gates for the device pass; Android only, private APK.
+**Status:** released 2026-11-01 — signed APK attached (`app-release.apk`).
+**Version:** `0.2.0` · **versionCode:** `3` · **package:** `tech.alatcerdas.openrator`.
+**Scope:** Android only, private APK (BYOK, no accounts, no analytics SDK).
 
-## Why a source-only release
+## Release artifact
+
+- `app-release.apk` — EAS build `ec4f08f0-1861-4980-b531-d58399b92f9d`,
+  commit `81054c3`, built from tag `v0.2.0` on the `production` profile.
+- Size: 86,517,454 bytes · SHA-256:
+  `07eb8e9c5d7e9d1aa617186f1f48212bdb896fa7b9e8b292dec5c8bc0064f1b1`.
+- Signing certificate SHA-256:
+  `389f40887d99b5947ae467e6120554d2c54afc12103123559bbb26f8c30ae79f`
+  (shared with the v0.1.1 APK).
 
 The milestone work in this release is **device-independent QA and release
-infrastructure**. Tagging it now makes the gates reproducible and reviewable
-before an APK exists. The device pass remains the only blocking work:
-sideload, 72 h crash-free soak, dashboard read-back with a management key.
+infrastructure**, plus the fixes needed to produce a real APK. The device pass
+remains the only blocking work: sideload, 72 h crash-free soak, and dashboard
+read-back with a management key.
 
 ## What changed
 
@@ -52,8 +60,7 @@ sideload, 72 h crash-free soak, dashboard read-back with a management key.
 
 ## Next steps
 
-1. Build the v0.2.0 APK (EAS `production` profile).
-2. Set `status: "artifact"` and record build id/commit/SHA-256/URL in
-   [`release.json`](release.json); run `npm run release:check`.
-3. Run the two-device pass via `npm run evidence:init`; complete the 72 h soak.
-4. Tag remains `v0.2.0`; attach the signed APK to the release when ready.
+1. Run the two-device pass via `npm run evidence:init`; complete the 72 h soak.
+2. Publish the F-Droid merge request using the updated signing fingerprint in
+   [`fdroiddata-tech.alatcerdas.openrator.yml`](fdroiddata-tech.alatcerdas.openrator.yml).
+3. Attach the rendered device evidence to the release record.

@@ -88,9 +88,11 @@ MaintainerNotes: |
   Binaries:
     - https://github.com/brrrassica/openrator/releases/download/v%v/app-release.apk
   AllowedAPKSigningKeys:
-    - b3ccb3f651aee39b5a21ff8ac919ec21d26d28e3bc17e6de892e541f0a067692
+    - 389f40887d99b5947ae467e6120554d2c54afc12103123559bbb26f8c30ae79f
 
-  The keystore (RSA-4096, alias=openrator) was generated 2026-10-25.
+  The signing keystore is managed by EAS Build for
+  tech.alatcerdas.openrator and was created 2026-11-01. It signs the
+  published v0.1.1 and v0.2.0 APKs.
   F-Droid publishes our APK only if the recipe rebuild is byte-identical;
   non-matching versions are skipped. See docs/05-fdroid-submission.md for
   the full rationale and release flow.

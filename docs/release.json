@@ -1,7 +1,12 @@
 {
-  "status": "source",
+  "status": "artifact",
   "version": "0.2.0",
   "versionCode": 3,
+  "buildId": "ec4f08f0-1861-4980-b531-d58399b92f9d",
+  "commit": "81054c31002c4bc539566fb45661a08ffc171b14",
+  "sha256": "07eb8e9c5d7e9d1aa617186f1f48212bdb896fa7b9e8b292dec5c8bc0064f1b1",
   "tag": "v0.2.0",
-  "releasedAt": "2026-10-31"
+  "apkUrl": "https://github.com/brrrassica/openrator/releases/download/v0.2.0/app-release.apk",
+  "bytes": 86517454,
+  "releasedAt": "2026-11-01"
 }
