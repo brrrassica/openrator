@@ -196,7 +196,7 @@
       "automated": true,
       "deviceRequired": true,
       "status": "yellow",
-      "evidence": "source-only v0.2.1 tag: manifests (package/app/eas), versionCode 4, and CHANGELOG agree; APK build + sideload + soak remain device-only",
+      "evidence": "manifests (package/app/eas) + docs/release.json agree with the CHANGELOG; sideload + crash-free soak remain device-only",
       "assertions": [
         {
           "name": "package.json and app.json versions agree",
@@ -224,9 +224,14 @@
           "detail": "## [0.2.1]"
         },
         {
-          "name": "source-only release records no fabricated APK identity",
+          "name": "APK SHA-256 is 64 lowercase hex characters",
           "ok": true,
-          "detail": "APK identity pending build"
+          "detail": "1c85e9f75c8c"
+        },
+        {
+          "name": "APK build id and commit are recorded",
+          "ok": true,
+          "detail": "57a70759-2713-4998-a85b-4efdd6798500 / 61c797458b6c8f5dbb30b28148aa721434b997ae"
         }
       ]
     }

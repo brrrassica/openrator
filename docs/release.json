@@ -1,7 +1,12 @@
 {
-  "status": "source",
+  "status": "artifact",
   "version": "0.2.1",
   "versionCode": 4,
+  "buildId": "57a70759-2713-4998-a85b-4efdd6798500",
+  "commit": "61c797458b6c8f5dbb30b28148aa721434b997ae",
+  "sha256": "1c85e9f75c8c7bfe7819421902de039442af909ae7826423a2b1ff44ceffe0ec",
   "tag": "v0.2.1",
+  "apkUrl": "https://github.com/brrrassica/openrator/releases/download/v0.2.1/openrator-0.2.1.apk",
+  "bytes": 86701832,
   "releasedAt": "2026-11-01"
 }

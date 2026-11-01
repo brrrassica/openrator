@@ -12,7 +12,7 @@ Column key: 🟢 = automated evidence complete · 🟡 = automated part passes, 
 | 4 | Provider toggle writes provider.ignore, reads back; UI rollback on failure | pass | pending | 🟡 | routing write/read-back/rollback verified on the serialized preset body; live OpenRouter read-back needs a device |
 | 5 | Key edit/revoke works and reflects on dashboard immediately | pass | pending | 🟡 | list/patch/delete/create wire contracts + reveal invariant verified; dashboard reflection needs a management key on a device |
 | 6 | No credential leaves the device except TLS to openrouter.ai | pass | n/a | 🟢 | transport header/body audit + persisted-field audit; also covered by tests/secrets-guard.test.ts in CI |
-| 7 | Builds via Expo, installs on Android 12+ without crash | pass | pending | 🟡 | source-only v0.2.1 tag: manifests (package/app/eas), versionCode 4, and CHANGELOG agree; APK build + sideload + soak remain device-only |
+| 7 | Builds via Expo, installs on Android 12+ without crash | pass | pending | 🟡 | manifests (package/app/eas) + docs/release.json agree with the CHANGELOG; sideload + crash-free soak remain device-only |
 
 ### Automated sub-checks
 
@@ -70,4 +70,5 @@ Column key: 🟢 = automated evidence complete · 🟡 = automated part passes, 
 - ✅ android versionCode is a positive integer and matches the release record — 4 / release 4
 - ✅ EAS production profile builds an internal APK — production/apk/internal
 - ✅ CHANGELOG records the released version — ## [0.2.1]
-- ✅ source-only release records no fabricated APK identity — APK identity pending build
+- ✅ APK SHA-256 is 64 lowercase hex characters — 1c85e9f75c8c
+- ✅ APK build id and commit are recorded — 57a70759-2713-4998-a85b-4efdd6798500 / 61c797458b6c8f5dbb30b28148aa721434b997ae

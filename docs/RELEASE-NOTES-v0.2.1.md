@@ -2,9 +2,19 @@
 
 ![OpenRator horizontal lockup](assets/lockup-horizontal.png)
 
-**Status:** source release 2026-11-01 (`docs/release.json` `status: "source"`).
+**Status:** released 2026-11-01 — signed APK attached (`openrator-0.2.1.apk`).
 **Version:** `0.2.1` · **versionCode:** `4` · **package:** `tech.alatcerdas.openrator`.
 **Scope:** Android only, private APK (BYOK, no accounts, no analytics SDK).
+
+## Release artifact
+
+- `openrator-0.2.1.apk` — EAS build `57a70759-2713-4998-a85b-4efdd6798500`,
+  commit `61c7974`, built from tag `v0.2.1` on the `production` profile.
+- Size: 86,701,832 bytes · SHA-256:
+  `1c85e9f75c8c7bfe7819421902de039442af909ae7826423a2b1ff44ceffe0ec`.
+- Signing certificate SHA-256:
+  `389f40887d99b5947ae467e6120554d2c54afc12103123559bbb26f8c30ae79f`
+  (shared with the v0.1.1 and v0.2.0 APKs).
 
 ## What changed
 
@@ -36,13 +46,15 @@
 
 - `npm run typecheck` clean.
 - Full unit suite: 21 files / 224 tests passed.
+- `npm run assets:check`, `npm run acceptance:check`,
+  `npm run acceptance:evidence`, and `npm run release:check` all green.
 - A transient live integration test through `OpenCodeClient` fetched the real
   Go endpoint successfully; the temporary test file was removed and no key is
   committed.
 
 ## Next steps
 
-1. Build the v0.2.1 APK and set `status: "artifact"` plus the build id, commit,
-   SHA-256, APK URL, and byte count in [`release.json`](release.json).
-2. Run the two-device pass via `npm run evidence:init`; complete the 72 h soak.
-3. Attach the rendered device evidence to the release record.
+1. Run the two-device pass via `npm run evidence:init`; complete the 72 h soak.
+2. Attach the rendered device evidence to the release record.
+3. Publish the F-Droid merge request using the updated signing fingerprint in
+   [`fdroiddata-tech.alatcerdas.openrator.yml`](fdroiddata-tech.alatcerdas.openrator.yml).
