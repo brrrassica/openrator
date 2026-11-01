@@ -86,7 +86,7 @@ MaintainerNotes: |
   in the metadata:
 
   Binaries:
-    - https://github.com/brrrassica/openrator/releases/download/v%v/app-release.apk
+    - https://github.com/brrrassica/openrator/releases/download/v%v/openrator-%v.apk
   AllowedAPKSigningKeys:
     - 389f40887d99b5947ae467e6120554d2c54afc12103123559bbb26f8c30ae79f
 

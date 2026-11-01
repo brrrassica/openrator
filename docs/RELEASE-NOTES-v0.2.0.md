@@ -2,13 +2,13 @@
 
 ![OpenRator horizontal lockup](assets/lockup-horizontal.png)
 
-**Status:** released 2026-11-01 — signed APK attached (`app-release.apk`).
+**Status:** released 2026-11-01 — signed APK attached (`openrator-0.2.0.apk`).
 **Version:** `0.2.0` · **versionCode:** `3` · **package:** `tech.alatcerdas.openrator`.
 **Scope:** Android only, private APK (BYOK, no accounts, no analytics SDK).
 
 ## Release artifact
 
-- `app-release.apk` — EAS build `ec4f08f0-1861-4980-b531-d58399b92f9d`,
+- `openrator-0.2.0.apk` — EAS build `ec4f08f0-1861-4980-b531-d58399b92f9d`,
   commit `81054c3`, built from tag `v0.2.0` on the `production` profile.
 - Size: 86,517,454 bytes · SHA-256:
   `07eb8e9c5d7e9d1aa617186f1f48212bdb896fa7b9e8b292dec5c8bc0064f1b1`.

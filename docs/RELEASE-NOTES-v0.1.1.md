@@ -3,7 +3,7 @@
 ![OpenRator horizontal lockup](assets/lockup-horizontal.png)
 
 **Status:** re-released 2026-11-01 with a signed APK attached
-(`app-release.apk`). The original tag was created 2026-10-08 as the first
+(`openrator-0.1.1.apk`). The original tag was created 2026-10-08 as the first
 F-Droid-facing release, but carried no binary.
 **Version:** `0.1.1` · **versionCode:** `2` · **package:** `tech.alatcerdas.openrator`.
 **Scope:** Android only. No user-facing feature changes over v0.1.0, which
@@ -11,7 +11,7 @@ passed days of device testing.
 
 ## Release artifact
 
-- `app-release.apk` — EAS build `c45b0765-e3d2-461a-85ab-377acdcc7998`,
+- `openrator-0.1.1.apk` — EAS build `c45b0765-e3d2-461a-85ab-377acdcc7998`,
   commit `46beea9`, built from tag `v0.1.1` on the `production` profile.
 - Size: 86,462,150 bytes · SHA-256:
   `c24e424309e7826dfcdcfb11673ada77337e7d5a9ac9f50a0250aa03a74428ef`.
@@ -43,7 +43,7 @@ carry the new id:
 ## Build & downloads
 
 - F-Droid builds from **tag `v0.1.1`** (commit `46beea9`).
-- Attached APK: `app-release.apk` (EAS `production` profile, internal
+- Attached APK: `openrator-0.1.1.apk` (EAS `production` profile, internal
   distribution). The build used Node `22.14.0` and the
   `ubuntu-24.04-jdk-17-ndk-r27b` image.
 - v0.1.0 EAS artifact (superseded, expired).
