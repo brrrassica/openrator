@@ -67,8 +67,12 @@ export class HttpClient {
     let lastErr: Error | undefined;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       if (attempt > 0) {
-        const backoffMs =
-          Math.min(500 * 2 ** (attempt - 1), 4000) + Math.floor(Math.random() * 150);
+        const retryAfterMs =
+          lastErr instanceof OpenRouterApiError ? lastErr.retryAfterMs : undefined;
+        const backoffMs = Math.max(
+          retryAfterMs ?? 0,
+          Math.min(500 * 2 ** (attempt - 1), 4000) + Math.floor(Math.random() * 150),
+        );
         await new Promise((r) => setTimeout(r, backoffMs));
       }
       const controller = new AbortController();

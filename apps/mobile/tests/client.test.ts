@@ -162,7 +162,9 @@ describe('OpenRouterClient', () => {
       if (attempts === 1) return res(429, { error: { message: 'Rate limited', code: 429 } }, { 'Retry-After': '1' });
       return res(200, { data: { total_credits: 1, total_usage: 0 } });
     });
+    const startedAt = Date.now();
     const credits = await client.getCredits();
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(900);
     expect(credits.totalCredits).toBe(1);
     expect(calls()).toHaveLength(2);
   });
