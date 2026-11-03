@@ -68,6 +68,39 @@ describe('computeHomeSummary', () => {
     expect(s.providers).toHaveLength(1);
   });
 
+  it('spend today sums every provider rollup for the day', () => {
+    // Rollups are keyed by (provider, day); "All providers" hands us one row per
+    // provider. Taking the first row under-reported today's spend.
+    const rollups = [
+      rollup('2026-10-05', 1.0),
+      { ...rollup('2026-10-05', 2.0), provider: 'anthropic' },
+      rollup('2026-10-04', 0.5),
+    ];
+    const s = computeHomeSummary({
+      key: key(),
+      rollups,
+      providers: [provider('ionstream'), provider('anthropic')],
+      today: TODAY,
+      staleCredits: false,
+      activityLocked: false,
+    });
+    expect(s.spendToday).toBeCloseTo(3.0); // 1.0 + 2.0, not just the first row
+    expect(s.spendToday).toBeCloseTo(s.trend[13]); // agrees with the trend
+    expect(s.spend7d).toBeCloseTo(3.5);
+  });
+
+  it('spend today is zero when only other days have rollups', () => {
+    const s = computeHomeSummary({
+      key: key(),
+      rollups: [rollup('2026-10-04', 1.0)],
+      providers: [provider('ionstream')],
+      today: TODAY,
+      staleCredits: false,
+      activityLocked: false,
+    });
+    expect(s.spendToday).toBe(0);
+  });
+
   it('warns when remaining < 10% of limit', () => {
     const s = computeHomeSummary({
       key: key({ limit: 4, limitRemaining: 0.3 }),

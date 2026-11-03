@@ -63,6 +63,28 @@ describe('device-evidence validator', () => {
     expect(report.findings.find((f) => f.name === 'criterion 2')?.ok).toBe(false);
   });
 
+  it('fails when a sign-off cell marks the fail branch as checked', () => {
+    // Hand-edited or badly rendered evidence: `[ ] pass / [x] fail` must not
+    // pass the strict gate just because the cell contains a checked box.
+    const broken = COMPLETED.replace(
+      '| Sideload on Device A | [x] pass / [ ] fail |',
+      '| Sideload on Device A | [ ] pass / [x] fail |',
+    );
+    const report = validateDeviceEvidence(broken);
+    expect(report.ok).toBe(false);
+    expect(report.findings.find((f) => f.name === 'Sideload on Device A')?.ok).toBe(false);
+  });
+
+  it('fails when a sign-off cell has both branches checked', () => {
+    const broken = COMPLETED.replace(
+      '| 72 h crash-free soak (B) | [x] pass / [ ] fail |',
+      '| 72 h crash-free soak (B) | [x] pass / [x] fail |',
+    );
+    const report = validateDeviceEvidence(broken);
+    expect(report.ok).toBe(false);
+    expect(report.findings.find((f) => f.name === '72 h crash-free soak (B)')?.ok).toBe(false);
+  });
+
   it('fails when a sign-off box is unchecked', () => {
     const broken = COMPLETED.replace('| 72 h crash-free soak (A) | [x] pass / [ ] fail |', '| 72 h crash-free soak (A) | [ ] pass / [ ] fail |');
     const report = validateDeviceEvidence(broken);

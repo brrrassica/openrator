@@ -68,8 +68,11 @@ export function computeHomeSummary(inputs: HomeInputs): HomeSummary {
   const trend = series.map((s) => s.spendUsd);
   const last7 = series.slice(-7);
   const spend7d = last7.reduce((s, x) => s + x.spendUsd, 0);
-  const todayRollup = rollups.find((r) => r.day === today);
-  const spendToday = todayRollup?.spendUsd ?? 0;
+  // Rollups are keyed by (provider, day), so "today" can span several rows.
+  // `find` kept only the first provider; sum them like the trend does.
+  const spendToday = rollups
+    .filter((r) => r.day === today)
+    .reduce((sum, r) => sum + r.spendUsd, 0);
 
   const weekStart = addDays(today, -7);
   const weekRollups = rollups.filter((r) => r.day >= weekStart);

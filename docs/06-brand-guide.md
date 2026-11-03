@@ -2,7 +2,7 @@
 
 ![OpenRator horizontal lockup](assets/lockup-horizontal.png)
 
-**Status:** v0.2.1 work-in-progress. Tagline and final palette accent are still
+**Status:** v0.2.2 work-in-progress. Tagline and final palette accent are still
 provisional (see §8). Full asset inventory: [`docs/assets/README.md`](assets/README.md).
 
 ---

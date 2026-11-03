@@ -2,6 +2,27 @@
 
 ![OpenRator v0.2 release banner](assets/release-banner.png)
 
+## [0.2.2] — 2026-11-03 — Report accuracy fixes (source-only)
+
+### Fixed
+- Home "spend today" only counted the first provider on the All-providers
+  scope. `DailyRollup` is keyed by `(provider, day)`, so the day can span
+  several rows; `computeHomeSummary` used `find` and dropped the rest, while
+  the 14-day trend summed them. Now sums every row for the day, so the today
+  figure and the last trend point agree.
+- Device-evidence rendering marked **failed** sign-offs as checked. The
+  checkbox was embedded in the `pass` label, so a `false` sign-off rendered as
+  `[ ] [x] pass / fail`, and `validateDeviceEvidence` gated on "contains a
+  checked box" rather than on which branch was checked — a failed row passed
+  strict validation. The renderer now checks whichever branch is true, and the
+  gate requires `pass` (or `yes`) checked with `fail` unchecked, so a
+  hand-edited `[ ] pass / [x] fail` fails too.
+- 6 regression tests for both fixes; suite at 231 tests.
+
+### Changed
+- Version bump to `0.2.2` (versionCode 5) across `package.json`, `app.json`,
+  `docs/release.json`, and the OpenCode client `User-Agent`.
+
 ## [0.2.0] — 2026-10-31 — QA & release gates (source-only)
 
 ### Added
