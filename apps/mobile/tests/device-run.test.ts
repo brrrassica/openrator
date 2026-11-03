@@ -156,6 +156,31 @@ describe('device-run rendering', () => {
     expect(markdown).toContain('| Optional M0.5A `/activity` shape capture | [ ] yes / [x] deferred |');
   });
 
+  it('renders a failed sign-off as failed, not as a checked box', () => {
+    const markdown = renderDeviceEvidence(
+      withSignOff({ sideloadA: false, sideloadB: false, soakA: false, soakB: false }),
+    );
+    expect(markdown).toContain('| Sideload on Device A | [ ] pass / [x] fail |');
+    expect(markdown).toContain('| 72 h crash-free soak (B) | [ ] pass / [x] fail |');
+    // No row may carry two checked boxes, and none may claim a pass.
+    for (const row of ['Sideload on Device A', 'Sideload on Device B', '72 h crash-free soak (A)', '72 h crash-free soak (B)']) {
+      const line = markdown.split('\n').find((l) => l.includes(`| ${row} |`)) ?? '';
+      expect(line).not.toContain('[x] pass');
+      expect(line.match(/\[x\]/g) ?? []).toHaveLength(1);
+    }
+  });
+
+  it('the strict validator rejects an all-failed sign-off render', () => {
+    const markdown = renderDeviceEvidence(
+      withSignOff({ sideloadA: false, sideloadB: false, soakA: false, soakB: false }),
+    );
+    const report = validateDeviceEvidence(markdown);
+    expect(report.ok).toBe(false);
+    for (const row of ['Sideload on Device A', 'Sideload on Device B', '72 h crash-free soak (A)', '72 h crash-free soak (B)']) {
+      expect(report.findings.find((f) => f.name === row)?.ok, row).toBe(false);
+    }
+  });
+
   it('renders deterministically', () => {
     expect(renderDeviceEvidence(completeRun())).toBe(renderDeviceEvidence(completeRun()));
   });

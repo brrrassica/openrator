@@ -192,8 +192,12 @@ export function validateDeviceRun(
 export function renderDeviceEvidence(run: DeviceRun): string {
   const [deviceA, deviceB] = run.devices;
   const lines: string[] = [];
-  const yesNo = (value: boolean, yes: string, no: string): string =>
-    value ? `${yes} / [ ] ${no}` : `[ ] ${yes} / ${no}`;
+  // The checkbox belongs to the branch that is actually true. Embedding `[x]`
+  // in the `yes` label rendered a failed sign-off as `[ ] [x] pass / fail`,
+  // which the strict validator then accepted because it only looked for any
+  // checked box.
+  const yesNo = (value: boolean): string =>
+    value ? '[x] pass / [ ] fail' : '[ ] pass / [x] fail';
   const activity =
     run.signOff.activityCapture === 'deferred'
       ? '[ ] yes / [x] deferred'
@@ -258,10 +262,10 @@ export function renderDeviceEvidence(run: DeviceRun): string {
   lines.push('');
   lines.push('| Check | Result |');
   lines.push('|---|---|');
-  lines.push(`| Sideload on Device A | ${yesNo(run.signOff.sideloadA, '[x] pass', 'fail')} |`);
-  lines.push(`| Sideload on Device B | ${yesNo(run.signOff.sideloadB, '[x] pass', 'fail')} |`);
-  lines.push(`| 72 h crash-free soak (A) | ${yesNo(run.signOff.soakA, '[x] pass', 'fail')} |`);
-  lines.push(`| 72 h crash-free soak (B) | ${yesNo(run.signOff.soakB, '[x] pass', 'fail')} |`);
+  lines.push(`| Sideload on Device A | ${yesNo(run.signOff.sideloadA)} |`);
+  lines.push(`| Sideload on Device B | ${yesNo(run.signOff.sideloadB)} |`);
+  lines.push(`| 72 h crash-free soak (A) | ${yesNo(run.signOff.soakA)} |`);
+  lines.push(`| 72 h crash-free soak (B) | ${yesNo(run.signOff.soakB)} |`);
   lines.push(`| Tag \`v${run.version}\` pushed to Gitea | ${run.signOff.tagPushed ? '[x] yes' : '[ ] yes'} |`);
   lines.push(`| Optional M0.5A \`/activity\` shape capture | ${activity} |`);
   lines.push('');

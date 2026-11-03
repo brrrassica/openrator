@@ -47,6 +47,21 @@ const TAG_ROW = /^\|\s*Tag `v[^`]+` pushed to Gitea\s*\|/;
 const PLACEHOLDER = /_{2,}/;
 const filled = (value: string): boolean => value.trim().length > 0 && !PLACEHOLDER.test(value);
 
+/**
+ * A sign-off cell counts as passed only when the affirmative branch is checked
+ * and the negative one is not.
+ *
+ * The previous gate was `/\[x\]/i`, which matched *any* checked box. A failed
+ * sign-off rendered as `[ ] [x] pass / fail` therefore validated green, and so
+ * did a hand-edited `[ ] pass / [x] fail`. Match the labels, not just the box.
+ */
+function signOffChecked(cell: string): boolean {
+  const checked = (label: string): boolean =>
+    new RegExp(`\\[x\\]\\s*${label}\\b`, 'i').test(cell);
+  if (checked('fail')) return false;
+  return checked('pass') || checked('yes');
+}
+
 function parseTableRow(line: string): string[] {
   return line
     .trim()
@@ -110,7 +125,7 @@ export function validateDeviceEvidence(
       continue;
     }
     const cell = parseTableRow(line).slice(1).join(' ');
-    const ok = template ? cell.length > 0 : /\[x\]/i.test(cell);
+    const ok = template ? cell.length > 0 : signOffChecked(cell);
     findings.push({
       name: row,
       ok,
@@ -124,7 +139,7 @@ export function validateDeviceEvidence(
     findings.push({ name: 'tag pushed', ok: false, detail: 'sign-off row missing' });
   } else {
     const cell = parseTableRow(tagLine).slice(1).join(' ');
-    const ok = template ? cell.length > 0 : /\[x\]/i.test(cell);
+    const ok = template ? cell.length > 0 : signOffChecked(cell);
     findings.push({
       name: 'tag pushed',
       ok,
@@ -157,7 +172,7 @@ export function validateDeviceEvidence(
     findings.push({ name: 'metadata acceptance report', ok: false, detail: 'row missing' });
   } else {
     const value = parseTableRow(acceptanceLine).slice(1).join(' ');
-    const ok = template ? value.length > 0 : /\[x\]/i.test(value);
+    const ok = template ? value.length > 0 : signOffChecked(value);
     findings.push({
       name: 'metadata acceptance report',
       ok,
