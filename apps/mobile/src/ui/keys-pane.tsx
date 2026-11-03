@@ -274,9 +274,9 @@ function KeyEditor({
     try {
       await management.patchKey(adminKey.hash, {
         label: label.trim() || undefined,
-        limit: limit.trim() ? Number(limit) : undefined,
+        limit: limit.trim() ? Number(limit) : 0,
         limitReset: reset || undefined,
-        expiresAt: expires.trim() || undefined,
+        expiresAt: expires.trim() || null,
       });
       await onDone();
     } catch (e) {

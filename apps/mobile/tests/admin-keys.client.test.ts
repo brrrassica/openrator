@@ -93,6 +93,19 @@ describe('management-key plane (client)', () => {
     expect(updated.label).toBe('renamed');
   });
 
+  it('clears a limit and expiry with explicit patch values', async () => {
+    const { client } = makeAdminClient(async (input, init) => {
+      expect(input).toContain('/keys/sk-or-v1-abc123');
+      const sent = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      expect(sent.limit).toBe(0);
+      expect(sent).toHaveProperty('expires_at', null);
+      return res(200, { data: { hash: 'sk-or-v1-abc123', limit: 0, expires_at: null } });
+    });
+    const updated = await client.patchAdminKey('sk-or-v1-abc123', { limit: 0, expiresAt: null });
+    expect(updated.limit).toBe(0);
+    expect(updated.expiresAt).toBeNull();
+  });
+
   it('deletes a key by hash with DELETE verb', async () => {
     const { client, calls } = makeAdminClient(async (input, init) => {
       expect(input).toContain('/keys/sk-or-v1-abc123');
