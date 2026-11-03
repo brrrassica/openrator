@@ -78,11 +78,11 @@ record observed deltas here after the device pass: ____
    - Machine-readable identity: [`release.json`](release.json) (version/versionCode/buildId/commit/sha256/tag/bytes)
 2. [ ] Sideload the APK on both matrix devices (§2)
 3. [ ] 72 h crash-free soak; record in §2
-4. [x] Tag `v0.2.1` on GitHub + push (source-only release: `docs/release.json` `status: "source"`; tag runs CI once more)
+4. [x] Tag `v0.2.2` on GitHub + push (source-only release: `docs/release.json` `status: "source"`; tag runs CI once more)
 5. [ ] Optional: `api_key_hash`-scoped `/activity` capture → pin v0.1 types (M0.5A)
 
-> **v0.2.1 is a source-only tag.** The release gate validates manifests,
-> versionCode 4, the tag, and the CHANGELOG, but there is no v0.2.1 APK yet.
+> **v0.2.2 is a source-only tag.** The release gate validates manifests,
+> versionCode 5, the tag, and the CHANGELOG, but there is no v0.2.2 APK yet.
 > Build it, set `status: "artifact"` plus the build id/commit/SHA-256 in
 > [`release.json`](release.json), then run the device pass and `release:check`.
 

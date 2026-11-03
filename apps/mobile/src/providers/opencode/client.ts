@@ -106,7 +106,7 @@ export class OpenCodeClient {
       maxRetries: opts.maxRetries,
       headers: {
         // Identify the client rather than a generic HTTP library (Go docs).
-        'User-Agent': 'OpenRator/0.2.1',
+        'User-Agent': 'OpenRator/0.2.2',
       },
     });
   }
