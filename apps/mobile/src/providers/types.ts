@@ -170,7 +170,7 @@ export interface ProviderManagement {
       limit?: number;
       limitReset?: string;
       includeByokInLimit?: boolean;
-      expiresAt?: string;
+      expiresAt?: string | null;
     },
   ): Promise<AdminKey>;
   deleteKey(hash: string): Promise<void>;

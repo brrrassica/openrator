@@ -293,7 +293,7 @@ export class OpenRouterClient {
       limit?: number;
       limitReset?: string;
       includeByokInLimit?: boolean;
-      expiresAt?: string;
+      expiresAt?: string | null;
     },
   ): Promise<AdminKey> {
     const wire: Record<string, unknown> = {};
