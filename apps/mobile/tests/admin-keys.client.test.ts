@@ -106,6 +106,17 @@ describe('management-key plane (client)', () => {
     expect(updated.expiresAt).toBeNull();
   });
 
+  it('clears a reset window with an explicit null patch value', async () => {
+    const { client } = makeAdminClient(async (input, init) => {
+      expect(input).toContain('/keys/sk-or-v1-abc123');
+      const sent = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      expect(sent).toHaveProperty('limit_reset', null);
+      return res(200, { data: { hash: 'sk-or-v1-abc123', limit_reset: null } });
+    });
+    const updated = await client.patchAdminKey('sk-or-v1-abc123', { limitReset: null });
+    expect(updated.limitReset).toBeNull();
+  });
+
   it('deletes a key by hash with DELETE verb', async () => {
     const { client, calls } = makeAdminClient(async (input, init) => {
       expect(input).toContain('/keys/sk-or-v1-abc123');
