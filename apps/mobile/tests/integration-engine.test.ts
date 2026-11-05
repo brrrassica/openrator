@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import { SqlDb } from '../src/store/db';
 import {
@@ -162,6 +162,19 @@ async function makeEngine() {
 }
 
 describe('engine E2E over real SQLite (M5.4)', () => {
+  // The fixtures below are anchored on 2026-10-04/05 and the engine keeps only
+  // activity inside a rolling ACTIVITY_WINDOW_DAYS window (30d). Pin the clock
+  // just past the fixtures so they stay inside the window: with a real clock
+  // the fixtures age out and the rollup assertions see zero rows.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-06T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('refreshAll populates keys/activity/rollups/providers/models from fixtures', async () => {
     const { db, engine } = await makeEngine();
     await engine.refreshAll();
