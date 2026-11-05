@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import { SqlDb } from '../src/store/db';
 import {
@@ -6,12 +6,15 @@ import {
   getActivityRows,
   getDailyRollups,
   getKeyRow,
+  getKeyRows,
   getSetting,
   listProvidersFromDb,
   migrate,
   pruneActivityOlderThan,
   SCHEMA_VERSION,
   upsertActivityRows,
+  upsertKeyRow,
+  withTransaction,
 } from '../src/store/daos';
 import { SyncEngine } from '../src/sync/sync-engine';
 import { CredentialService, MemoryKeyValueStore } from '../src/core/credentials';
@@ -159,6 +162,19 @@ async function makeEngine() {
 }
 
 describe('engine E2E over real SQLite (M5.4)', () => {
+  // The fixtures below are anchored on 2026-10-04/05 and the engine keeps only
+  // activity inside a rolling ACTIVITY_WINDOW_DAYS window (30d). Pin the clock
+  // just past the fixtures so they stay inside the window: with a real clock
+  // the fixtures age out and the rollup assertions see zero rows.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-06T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('refreshAll populates keys/activity/rollups/providers/models from fixtures', async () => {
     const { db, engine } = await makeEngine();
     await engine.refreshAll();
@@ -299,6 +315,54 @@ describe('engine E2E over real SQLite (M5.4)', () => {
     await expect(upsertActivityRows(flaky, rows)).rejects.toThrow('disk full');
     // the first insert was rolled back with the rest
     expect(await getActivityRows(db)).toHaveLength(0);
+  });
+
+  it('serialises concurrent transactions on the same connection', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    const order: string[] = [];
+    const write = async (name: string) => {
+      order.push(`${name}-start`);
+      await db.runAsync(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        `tx.${name}`,
+        name,
+      );
+      order.push(`${name}-end`);
+    };
+    // Both callers would issue BEGIN at the same time without the queue.
+    await Promise.all([
+      withTransaction(db, () => write('a')),
+      withTransaction(db, () => write('b')),
+    ]);
+    expect(order).toEqual(['a-start', 'a-end', 'b-start', 'b-end']);
+    expect(await getSetting(db, 'tx.a')).toBe('a');
+    expect(await getSetting(db, 'tx.b')).toBe('b');
+  });
+
+  it('replacing a key purges stale rows for that provider only', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    const key = (provider: string, hash: string) => ({
+      provider,
+      hash,
+      label: hash,
+      isManagement: 0,
+      limit: 10,
+      limitRemaining: 4,
+      limitReset: null,
+      usageMonthly: 6,
+      usageDaily: 0,
+      usageWeekly: 0,
+      expiresAt: null,
+      updatedAt: '2026-10-05',
+    });
+    await upsertKeyRow(db, key('openrouter', 'old'));
+    await upsertKeyRow(db, key('opencode-zen', 'zen'));
+    await upsertKeyRow(db, key('openrouter', 'new'));
+
+    expect((await getKeyRows(db, 'openrouter')).map((r) => r.hash)).toEqual(['new']);
+    expect((await getKeyRows(db, 'opencode-zen')).map((r) => r.hash)).toEqual(['zen']);
   });
 
   it('migrate upgrades a v1 database to the latest schema (WS2-3)', async () => {
