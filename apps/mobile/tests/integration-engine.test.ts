@@ -6,12 +6,15 @@ import {
   getActivityRows,
   getDailyRollups,
   getKeyRow,
+  getKeyRows,
   getSetting,
   listProvidersFromDb,
   migrate,
   pruneActivityOlderThan,
   SCHEMA_VERSION,
   upsertActivityRows,
+  upsertKeyRow,
+  withTransaction,
 } from '../src/store/daos';
 import { SyncEngine } from '../src/sync/sync-engine';
 import { CredentialService, MemoryKeyValueStore } from '../src/core/credentials';
@@ -299,6 +302,54 @@ describe('engine E2E over real SQLite (M5.4)', () => {
     await expect(upsertActivityRows(flaky, rows)).rejects.toThrow('disk full');
     // the first insert was rolled back with the rest
     expect(await getActivityRows(db)).toHaveLength(0);
+  });
+
+  it('serialises concurrent transactions on the same connection', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    const order: string[] = [];
+    const write = async (name: string) => {
+      order.push(`${name}-start`);
+      await db.runAsync(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        `tx.${name}`,
+        name,
+      );
+      order.push(`${name}-end`);
+    };
+    // Both callers would issue BEGIN at the same time without the queue.
+    await Promise.all([
+      withTransaction(db, () => write('a')),
+      withTransaction(db, () => write('b')),
+    ]);
+    expect(order).toEqual(['a-start', 'a-end', 'b-start', 'b-end']);
+    expect(await getSetting(db, 'tx.a')).toBe('a');
+    expect(await getSetting(db, 'tx.b')).toBe('b');
+  });
+
+  it('replacing a key purges stale rows for that provider only', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    const key = (provider: string, hash: string) => ({
+      provider,
+      hash,
+      label: hash,
+      isManagement: 0,
+      limit: 10,
+      limitRemaining: 4,
+      limitReset: null,
+      usageMonthly: 6,
+      usageDaily: 0,
+      usageWeekly: 0,
+      expiresAt: null,
+      updatedAt: '2026-10-05',
+    });
+    await upsertKeyRow(db, key('openrouter', 'old'));
+    await upsertKeyRow(db, key('opencode-zen', 'zen'));
+    await upsertKeyRow(db, key('openrouter', 'new'));
+
+    expect((await getKeyRows(db, 'openrouter')).map((r) => r.hash)).toEqual(['new']);
+    expect((await getKeyRows(db, 'opencode-zen')).map((r) => r.hash)).toEqual(['zen']);
   });
 
   it('migrate upgrades a v1 database to the latest schema (WS2-3)', async () => {

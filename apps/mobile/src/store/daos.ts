@@ -197,23 +197,49 @@ export async function migrate(db: SqlDb): Promise<void> {
 }
 
 /**
- * Runs `fn` inside a single SQLite transaction (WS2-2). Commits on success,
- * rolls back on any throw so batched writes are all-or-nothing.
+ * Per-connection transaction queue. SQLite permits only one transaction per
+ * connection, so concurrent calls on the same `SqlDb` are chained rather than
+ * allowed to interleave their BEGIN/COMMIT pairs.
  */
-export async function withTransaction<T>(db: SqlDb, fn: () => Promise<T>): Promise<T> {
-  await db.execAsync('BEGIN');
+const transactionQueues = new WeakMap<SqlDb, Promise<unknown>>();
+
+async function runTransaction<T>(db: SqlDb, fn: () => Promise<T>): Promise<T> {
+  let begun = false;
   try {
+    await db.execAsync('BEGIN');
+    begun = true;
     const result = await fn();
     await db.execAsync('COMMIT');
     return result;
   } catch (e) {
-    try {
-      await db.execAsync('ROLLBACK');
-    } catch {
-      // ignore rollback failure — surface the original error
+    if (begun) {
+      try {
+        await db.execAsync('ROLLBACK');
+      } catch {
+        // ignore rollback failure — surface the original error
+      }
     }
     throw e;
   }
+}
+
+/**
+ * Runs `fn` inside a single SQLite transaction (WS2-2). Commits on success,
+ * rolls back on any throw so batched writes are all-or-nothing. Concurrent
+ * callers on the same connection are serialised through a promise queue.
+ */
+export async function withTransaction<T>(db: SqlDb, fn: () => Promise<T>): Promise<T> {
+  const previous = transactionQueues.get(db) ?? Promise.resolve();
+  const run = previous.then(
+    () => runTransaction(db, fn),
+    () => runTransaction(db, fn),
+  );
+  // Keep the chain alive after a failure without poisoning later callers.
+  transactionQueues.set(db, run.then(
+    () => undefined,
+    () => undefined,
+  ));
+  return run;
 }
 
 /**
@@ -242,11 +268,15 @@ export async function getSetting(db: SqlDb, key: string): Promise<string | null>
 }
 
 async function writeSetting(db: SqlDb, key: string, value: string): Promise<void> {
-  await db.runAsync(
-    'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
-    key,
-    value,
-  );
+  // Route every write through the shared transaction queue so it can never
+  // land inside another source's open transaction (and be rolled back with it).
+  await withTransaction(db, async () => {
+    await db.runAsync(
+      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+      key,
+      value,
+    );
+  });
 }
 
 export async function setSetting(db: SqlDb, key: string, value: string): Promise<void> {
@@ -354,25 +384,39 @@ function rowToManualUsage(r: Record<string, unknown>): ManualUsageRow {
 
 // ---- keys ----------------------------------------------------------------
 
+/**
+ * Persists the provider's current credential snapshot. The keys table holds a
+ * single active key per provider, so any rows left over from a replaced key
+ * are purged in the same transaction — otherwise aggregate totals would keep
+ * counting the abandoned key.
+ */
 export async function upsertKeyRow(db: SqlDb, row: KeyRow): Promise<void> {
-  await db.runAsync(
-    `INSERT OR REPLACE INTO keys
-      (provider, hash, label, is_management, "limit", limit_remaining, limit_reset,
-       usage_monthly, usage_daily, usage_weekly, expires_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    row.provider ?? DEFAULT_PROVIDER,
-    row.hash,
-    row.label,
-    row.isManagement,
-    row.limit,
-    row.limitRemaining,
-    row.limitReset ?? null,
-    row.usageMonthly,
-    row.usageDaily,
-    row.usageWeekly,
-    row.expiresAt ?? null,
-    row.updatedAt,
-  );
+  const provider = row.provider ?? DEFAULT_PROVIDER;
+  await withTransaction(db, async () => {
+    await db.runAsync(
+      'DELETE FROM keys WHERE provider = ? AND hash <> ?',
+      provider,
+      row.hash,
+    );
+    await db.runAsync(
+      `INSERT OR REPLACE INTO keys
+        (provider, hash, label, is_management, "limit", limit_remaining, limit_reset,
+         usage_monthly, usage_daily, usage_weekly, expires_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      provider,
+      row.hash,
+      row.label,
+      row.isManagement,
+      row.limit,
+      row.limitRemaining,
+      row.limitReset ?? null,
+      row.usageMonthly,
+      row.usageDaily,
+      row.usageWeekly,
+      row.expiresAt ?? null,
+      row.updatedAt,
+    );
+  });
 }
 
 export async function getKeyRow(
@@ -509,15 +553,17 @@ export async function pruneActivityOlderThan(
   dayExclusive: string,
   provider?: string,
 ): Promise<void> {
-  if (provider) {
-    await db.runAsync(
-      'DELETE FROM endpoint_activity WHERE provider = ? AND day < ?',
-      provider,
-      dayExclusive,
-    );
-    return;
-  }
-  await db.runAsync('DELETE FROM endpoint_activity WHERE day < ?', dayExclusive);
+  await withTransaction(db, async () => {
+    if (provider) {
+      await db.runAsync(
+        'DELETE FROM endpoint_activity WHERE provider = ? AND day < ?',
+        provider,
+        dayExclusive,
+      );
+      return;
+    }
+    await db.runAsync('DELETE FROM endpoint_activity WHERE day < ?', dayExclusive);
+  });
 }
 
 // ---- daily rollups -------------------------------------------------------
