@@ -291,7 +291,7 @@ export class OpenRouterClient {
     body: {
       label?: string;
       limit?: number;
-      limitReset?: string;
+      limitReset?: string | null;
       includeByokInLimit?: boolean;
       expiresAt?: string | null;
     },
