@@ -188,11 +188,13 @@ export class SyncEngine {
       const credential = await this.credential(provider);
       if (!credential) throw new Error('No credential saved for this provider');
       const snapshot = await adapter.getAccount(credential);
+      // A user-entered onboarding label wins over the provider's key label.
+      const localLabel = await this.creds.getLabel(provider);
 
       await upsertKeyRow(this.db, {
         provider,
         hash: snapshot.fingerprint,
-        label: snapshot.label,
+        label: localLabel ?? snapshot.label,
         isManagement: snapshot.isManagement ? 1 : 0,
         limit: snapshot.limit,
         limitRemaining: snapshot.limitRemaining,

@@ -43,6 +43,23 @@ describe('CredentialService — never logs, format-gated', () => {
     expect(await svc.isManagementKey()).toBe(false);
   });
 
+  it('persists the optional display label and clears it on empty input', async () => {
+    const svc = new CredentialService(new MemoryKeyValueStore());
+    await svc.saveLabel('  My main key  ');
+    expect(await svc.getLabel()).toBe('My main key');
+    await svc.saveLabel('');
+    expect(await svc.getLabel()).toBeNull();
+  });
+
+  it('clearing the management key also clears the management flag', async () => {
+    const svc = new CredentialService(new MemoryKeyValueStore());
+    await svc.saveManagementKey('sk-or-v1-mgmt-key-0123456789abcdef');
+    expect(await svc.isManagementKey()).toBe(true);
+    await svc.saveManagementKey('');
+    expect(await svc.getManagementKey()).toBeNull();
+    expect(await svc.isManagementKey()).toBe(false);
+  });
+
   it('saveKey rejects when the secure store write fails (WS2-7)', async () => {
     const svc = new CredentialService(new FailingStore());
     await expect(

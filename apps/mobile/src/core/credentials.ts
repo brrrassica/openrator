@@ -2,9 +2,9 @@
  * OpenRator — credential handling (spec §6.2, D2/D7, M0.8, M7.4).
  *
  * Credentials live in expo-secure-store, never SQLite. v0.2 namespaces every
- * value under `provider.<id>.key` and optionally
- * `provider.<id>.management_key`. The legacy single OpenRouter key is migrated
- * exactly once.
+ * value under `provider.<id>.key`, optionally `provider.<id>.management_key`,
+ * and the user's display `provider.<id>.label`. The legacy single OpenRouter
+ * key is migrated exactly once.
  */
 
 import { PROVIDER_IDS, ProviderCredential, ProviderId } from '../providers/types';
@@ -21,6 +21,7 @@ const LEGACY_MGMT = 'openrator.openrouter.is_management';
 
 const keyName = (provider: ProviderId) => `provider.${provider}.key`;
 const mgmtName = (provider: ProviderId) => `provider.${provider}.management_key`;
+const labelName = (provider: ProviderId) => `provider.${provider}.label`;
 const flagName = (provider: ProviderId) => `provider.${provider}.is_management`;
 
 /** In-memory store — tests only. */
@@ -135,6 +136,21 @@ export class CredentialService {
     return false;
   }
 
+  // ---- optional display label ---------------------------------------------
+
+  /** Persist the user's label; empty/null removes it. */
+  async saveLabel(label: string | null, provider: ProviderId = 'openrouter'): Promise<void> {
+    if (label === null || label.trim() === '') {
+      await this.store.delete(labelName(provider));
+      return;
+    }
+    await this.store.set(labelName(provider), label.trim());
+  }
+
+  async getLabel(provider: ProviderId = 'openrouter'): Promise<string | null> {
+    return this.store.get(labelName(provider));
+  }
+
   // ---- optional management key (D13) --------------------------------------
 
   async saveManagementKey(
@@ -157,6 +173,7 @@ export class CredentialService {
   async clearProvider(provider: ProviderId): Promise<void> {
     await this.store.delete(keyName(provider));
     await this.store.delete(mgmtName(provider));
+    await this.store.delete(labelName(provider));
     await this.store.delete(flagName(provider));
   }
 
