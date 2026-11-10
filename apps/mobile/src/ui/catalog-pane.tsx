@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SqlDb } from '../store/db';
 import { listProvidersFromDb } from '../store/daos';
-import { SyncEngine, isStale } from '../sync/sync-engine';
+import { SyncEngine, isScopeStale } from '../sync/sync-engine';
 import { POLL } from '../core/config';
 import { Provider } from '../core/types';
 import { ProviderId } from '../providers/types';
@@ -75,8 +75,12 @@ export default function CatalogPane({ engine, db, provider = 'all' }: Props) {
         : a.name.localeCompare(b.name),
     );
 
-  const stale = (provider === 'all' ? engine.getProviders() : [provider]).some((id) =>
-    isStale(engine.getStatus(id).providers?.lastOkAt, POLL.SNAPSHOT_DAILY_MS),
+  const stale = isScopeStale(
+    engine,
+    provider === 'all' ? engine.getProviders() : [provider],
+    'providers',
+    'providerCatalog',
+    POLL.SNAPSHOT_DAILY_MS,
   );
 
   return (

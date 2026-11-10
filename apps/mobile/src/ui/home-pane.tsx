@@ -23,7 +23,7 @@ import {
   listManualUsage,
   listProvidersFromDb,
 } from '../store/daos';
-import { SyncEngine, isStale } from '../sync/sync-engine';
+import { SyncEngine, isScopeStale } from '../sync/sync-engine';
 import { POLL } from '../core/config';
 import { DailyRollup, KeyRow, Provider } from '../core/types';
 import { buildPlanInfo, planSettingSuffix } from '../core/plan';
@@ -179,8 +179,12 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
 
   const scopeIds = provider === 'all' ? engine.getProviders() : [provider];
   const statuses = scopeIds.map((id) => engine.getStatus(id));
-  const staleCredits = statuses.some((s) =>
-    isStale(s.credits?.lastOkAt, POLL.CREDITS_FOREGROUND_MS * 2),
+  const staleCredits = isScopeStale(
+    engine,
+    scopeIds,
+    'credits',
+    'accountBalance',
+    POLL.CREDITS_FOREGROUND_MS * 2,
   );
   const activityLocked =
     scopeIds.length > 0 &&
