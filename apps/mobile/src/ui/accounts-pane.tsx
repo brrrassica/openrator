@@ -53,6 +53,7 @@ export default function AccountsPane({
     const next: Record<string, string> = {};
     for (const id of ids) {
       next[id] =
+        (await creds.getLabel(id)) ??
         (await getProviderSetting(db, id, 'account.label')) ??
         (await getProviderSetting(db, id, 'credential.key_hash')) ??
         'saved key';
@@ -93,7 +94,7 @@ export default function AccountsPane({
     setError(null);
     try {
       await creds.saveKey(key, false, selected);
-      if (descriptor.supportsManagementKey && mgmtKey.trim()) {
+      if (descriptor.supportsManagementKey) {
         await creds.saveManagementKey(mgmtKey.trim(), selected);
       }
       setKey('');

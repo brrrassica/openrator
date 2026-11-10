@@ -42,6 +42,7 @@ export default function OnboardingScreen({
     setErr(null);
     try {
       await creds.saveKey(key, provider.supportsManagementKey ? isMgmt : false, providerId);
+      await creds.saveLabel(label, providerId);
       onDone();
     } catch (e) {
       // WS2-7: a failed secure-store write must be surfaced; we do NOT advance.

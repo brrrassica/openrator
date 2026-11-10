@@ -158,7 +158,7 @@ async function makeEngine() {
   const creds = new CredentialService(new MemoryKeyValueStore());
   await creds.saveKey(FIXTURE_KEY, true);
   const engine = new SyncEngine(makeClient(), creds, db, {});
-  return { db, engine };
+  return { db, creds, engine };
 }
 
 describe('engine E2E over real SQLite (M5.4)', () => {
@@ -224,6 +224,14 @@ describe('engine E2E over real SQLite (M5.4)', () => {
 
     // /models/user reflection
     expect(await getSetting(db, 'models_user_count')).toBe('2');
+  });
+
+  it('refreshAll prefers a locally saved label over the provider key label', async () => {
+    const { db, creds, engine } = await makeEngine();
+    await creds.saveLabel('My main key', 'openrouter');
+    await engine.refreshAll();
+    const rows = await getKeyRows(db, 'openrouter');
+    expect(rows[0]?.label).toBe('My main key');
   });
 
   it('prune removes rows older than the retention window', async () => {
