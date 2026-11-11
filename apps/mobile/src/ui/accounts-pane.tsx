@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CredentialService } from '../core/credentials';
 import {
   clearAllData,
@@ -143,6 +143,18 @@ export default function AccountsPane({
     } finally {
       setBusy(false);
     }
+  };
+
+  const confirmSignOut = () => {
+    if (!onSignOut) return;
+    Alert.alert(
+      'Sign out all providers?',
+      'This removes every credential and wipes cached usage data from this device.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign out', style: 'destructive', onPress: onSignOut },
+      ],
+    );
   };
 
   return (
@@ -290,7 +302,7 @@ export default function AccountsPane({
         {onSignOut ? (
           <Pressable
             style={[styles.segment, { borderColor: t.danger, alignSelf: 'flex-start', marginTop: 10 }]}
-            onPress={onSignOut}
+            onPress={confirmSignOut}
             accessibilityRole="button"
           >
             <Text style={{ color: t.danger, fontSize: 12, fontWeight: '700' }}>

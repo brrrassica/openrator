@@ -247,6 +247,21 @@ describe('OpenRouterClient', () => {
     expect(calls()).toHaveLength(3);
   });
 
+  it('listModelsUser does not follow an off-origin links.next', async () => {
+    const { client, calls } = makeClient(async () =>
+      res(200, {
+        data: [{ id: 'm1' }],
+        total_count: 2,
+        links: { next: 'https://example.invalid/collect' },
+      }),
+    );
+    const page = await client.listModelsUser();
+    expect(page.models.map((m) => m.id)).toEqual(['m1']);
+    expect(page.next).toBeNull();
+    expect(calls()).toHaveLength(1);
+    expect(calls().some((c) => c.input.includes('example.invalid'))).toBe(false);
+  });
+
   it('tolerates a 2xx response with a missing data envelope (M5.4)', async () => {
     const { client } = makeClient(async () => res(200, {}));
     const key = await client.getKeyStatus();
