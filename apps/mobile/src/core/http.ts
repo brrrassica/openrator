@@ -39,6 +39,19 @@ function isAbortError(e: unknown): boolean {
   );
 }
 
+/**
+ * True when an absolute URL targets the same origin as the configured API.
+ * Malformed candidates are rejected so a bad `links.next` cannot redirect the
+ * bearer token to another host.
+ */
+export function isSameOriginUrl(url: string, baseUrl: string): boolean {
+  try {
+    return new URL(url).origin === new URL(baseUrl).origin;
+  } catch {
+    return false;
+  }
+}
+
 export class HttpClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
@@ -63,6 +76,9 @@ export class HttpClient {
   }
 
   async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    if (path.startsWith('http') && !isSameOriginUrl(path, this.baseUrl)) {
+      throw new OpenRouterNetworkError('refusing to send credentials to a different origin');
+    }
     const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
     let lastErr: Error | undefined;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {

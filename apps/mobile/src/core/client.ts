@@ -6,7 +6,7 @@
  */
 
 import { OPENROUTER_BASE_URL, POLL } from './config';
-import { FetchLike, HttpClient } from './http';
+import { FetchLike, HttpClient, isSameOriginUrl } from './http';
 import {
   ActivityPage,
   ActivityRecord,
@@ -190,6 +190,14 @@ export class OpenRouterClient {
     let pages = 0;
     do {
       const path = cursor ?? '/models/user';
+      if (
+        path.startsWith('http') &&
+        !isSameOriginUrl(path, this.opts.baseUrl ?? OPENROUTER_BASE_URL)
+      ) {
+        // A hostile/malformed pagination link must not receive the bearer key.
+        next = null;
+        break;
+      }
       const page = await this.singleFlight(() =>
         this.request<{ data: unknown[]; total_count?: number; links?: { next?: string | null } }>(
           'GET',
