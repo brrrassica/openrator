@@ -26,6 +26,7 @@ import { ActivityRow, Provider } from '../core/types';
 import {
   AccountSnapshot,
   ProviderAdapter,
+  ProviderCapabilities,
   ProviderId,
   ProviderManagement,
 } from '../providers/types';
@@ -457,4 +458,20 @@ export class SyncEngine {
 /** Cache freshness helpers for the UI ("stale" badge, spec §7). */
 export function isStale(lastOkAt: number | undefined, maxMs: number): boolean {
   return lastOkAt === undefined || Date.now() - lastOkAt > maxMs;
+}
+
+/**
+ * Staleness across a provider scope, ignoring providers that do not support
+ * the source at all (their `lastOkAt` is intentionally never set).
+ */
+export function isScopeStale(
+  engine: Pick<SyncEngine, 'getCapabilities' | 'getStatus'>,
+  providers: ProviderId[],
+  source: SourceName,
+  capability: keyof ProviderCapabilities,
+  maxMs: number,
+): boolean {
+  return providers
+    .filter((id) => engine.getCapabilities(id)?.[capability])
+    .some((id) => isStale(engine.getStatus(id)[source]?.lastOkAt, maxMs));
 }

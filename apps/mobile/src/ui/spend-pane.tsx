@@ -22,7 +22,7 @@ import {
   listManualUsage,
   listProvidersFromDb,
 } from '../store/daos';
-import { SyncEngine, isStale } from '../sync/sync-engine';
+import { SyncEngine, isScopeStale } from '../sync/sync-engine';
 import { POLL } from '../core/config';
 import { addDays } from '../sync/rollups';
 import { ActivityRow, KeyRow, Provider } from '../core/types';
@@ -110,8 +110,12 @@ export default function SpendPane({ engine, db, provider = 'all' }: Props) {
     scopeIds.length > 0 &&
     statuses.every((s) => s.activity?.error === 'management key required');
   const summary = computeSpendSummary(rows, providers, new Date().toISOString().slice(0, 10), period);
-  const staleActivity = statuses.some((s) =>
-    isStale(s.activity?.lastOkAt, POLL.ACTIVITY_FOREGROUND_MS * 2),
+  const staleActivity = isScopeStale(
+    engine,
+    scopeIds,
+    'activity',
+    'activityHistory',
+    POLL.ACTIVITY_FOREGROUND_MS * 2,
   );
 
   return (

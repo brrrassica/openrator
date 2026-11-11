@@ -74,7 +74,7 @@ export function computeHomeSummary(inputs: HomeInputs): HomeSummary {
     .filter((r) => r.day === today)
     .reduce((sum, r) => sum + r.spendUsd, 0);
 
-  const weekStart = addDays(today, -7);
+  const weekStart = addDays(today, -6);
   const weekRollups = rollups.filter((r) => r.day >= weekStart);
   const top: TopRow[] = topEndpoints(weekRollups, 6).map((t) => ({
     endpoint: t.endpoint,

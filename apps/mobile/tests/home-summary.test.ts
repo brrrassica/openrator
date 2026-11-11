@@ -68,6 +68,27 @@ describe('computeHomeSummary', () => {
     expect(s.providers).toHaveLength(1);
   });
 
+  it('top endpoints use exactly the last seven days', () => {
+    const withEndpoint = (day: string, spendUsd: number, endpoint: string): DailyRollup => ({
+      ...rollup(day, spendUsd),
+      byEndpoint: { [endpoint]: { requests: 1, spendUsd, tokens: 100 } },
+    });
+    const s = computeHomeSummary({
+      key: key(),
+      rollups: [
+        withEndpoint('2026-10-05', 1.0, 'today'),
+        withEndpoint('2026-09-29', 2.0, 'inside'), // today - 6
+        withEndpoint('2026-09-28', 9.0, 'outside'), // today - 7, excluded
+      ],
+      providers: [provider('ionstream')],
+      today: TODAY,
+      staleCredits: false,
+      activityLocked: false,
+    });
+    expect(s.spend7d).toBeCloseTo(3.0);
+    expect(s.top.map((r) => r.endpoint)).toEqual(['inside', 'today']);
+  });
+
   it('spend today sums every provider rollup for the day', () => {
     // Rollups are keyed by (provider, day); "All providers" hands us one row per
     // provider. Taking the first row under-reported today's spend.
