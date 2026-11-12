@@ -1,6 +1,6 @@
 /**
  * OpenRator — OpenRouterClient: typed fetch layer over /api/v1.
- * Timeouts, single-flight per key, retry/backoff for retriable failures,
+ * Timeouts, single-flight per key, retry/backoff for idempotent requests,
  * and error mapping per docs/03-spike-notes.md §3. The raw key is only ever
  * placed in the Authorization header.
  */

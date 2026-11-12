@@ -186,14 +186,21 @@ function Inner() {
         db={ctx.db}
         creds={ctx.creds}
         onAccountsChanged={() => void rebuild()}
-        onSignOut={() => {
+        onSignOut={async () => {
           engine.stop();
-          void (async () => {
+          try {
             await ctx.creds.clear();
             await clearAllData(ctx.db);
             await setSetting(ctx.db, 'credential.key_hash', '');
             await setSetting(ctx.db, 'credential.key_prefix', '');
-          })();
+          } catch (e) {
+            const message = e instanceof Error ? e.message : String(e);
+            // Stay on the current screen with the failure visible, and keep
+            // background sync alive if the teardown did not finish.
+            engine.start(true);
+            setNote(message);
+            throw e;
+          }
           setEngine(null);
           setStage('onboarding');
         }}

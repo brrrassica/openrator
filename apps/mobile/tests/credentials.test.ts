@@ -60,6 +60,16 @@ describe('CredentialService — never logs, format-gated', () => {
     expect(await svc.isManagementKey()).toBe(false);
   });
 
+  it('isManagementFlag ignores a separate management key', async () => {
+    const svc = new CredentialService(new MemoryKeyValueStore());
+    await svc.saveKey('sk-or-v1-abcdef-0123456789abcdefghij', false);
+    await svc.saveManagementKey('sk-or-v1-mgmt-key-0123456789abcdef');
+    expect(await svc.isManagementFlag()).toBe(false);
+    expect(await svc.isManagementKey()).toBe(true);
+    await svc.saveKey('sk-or-v1-abcdef-0123456789abcdefghij', true);
+    expect(await svc.isManagementFlag()).toBe(true);
+  });
+
   it('saveKey rejects when the secure store write fails (WS2-7)', async () => {
     const svc = new CredentialService(new FailingStore());
     await expect(
