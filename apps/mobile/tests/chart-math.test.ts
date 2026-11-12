@@ -62,6 +62,13 @@ describe('donutSegments', () => {
     expect(donutSegments([{ value: 0, color: 'x' }])).toEqual([]);
     expect(donutSegments([{ value: -5, color: 'x' }, { value: 5, color: 'y' }])).toHaveLength(1);
   });
+
+  it('single 100% slice spans a full circle', () => {
+    const segs = donutSegments([{ value: 10, color: 'a' }]);
+    expect(segs).toHaveLength(1);
+    expect(segs[0].start).toBe(0);
+    expect(segs[0].end).toBeCloseTo(Math.PI * 2, 6);
+  });
 });
 
 describe('arcPath', () => {
@@ -69,6 +76,14 @@ describe('arcPath', () => {
     const d = arcPath(50, 50, 40, 10, 0, Math.PI / 2);
     expect(d.startsWith('M ')).toBe(true);
     expect(d).toContain(' A 40 40 0 0 1 ');
+  });
+
+  it('emits two half arcs for a full circle so the ring is visible', () => {
+    const [seg] = donutSegments([{ value: 10, color: 'a' }]);
+    const d = arcPath(50, 50, 40, 10, seg.start, seg.end);
+    expect(d.match(/ A /g)).toHaveLength(2);
+    expect(d.startsWith('M 90.00 50.00 A 40 40 0 0 1 ')).toBe(true);
+    expect(d).not.toBe('M 90.00 50.00 A 40 40 0 1 1 90.00 50.00');
   });
 });
 
