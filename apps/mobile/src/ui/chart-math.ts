@@ -78,6 +78,11 @@ export function arcPath(
 ): string {
   const start = polar(cx, cy, r, startAngle);
   const end = polar(cx, cy, r, endAngle);
+  // A full circle has coincident endpoints, which SVG omits; draw two halves.
+  if (endAngle - startAngle >= Math.PI * 2 - 1e-6) {
+    const mid = polar(cx, cy, r, startAngle + Math.PI);
+    return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 0 1 ${mid.x.toFixed(2)} ${mid.y.toFixed(2)} A ${r} ${r} 0 0 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+  }
   const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
   return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
 }

@@ -155,6 +155,11 @@ describe('OpenRouterClient', () => {
     expect(calls()).toHaveLength(1);
   });
 
+  it('upsertPreset: tolerates a 2xx response with a missing data envelope', async () => {
+    const { client } = makeClient(async () => res(200, {}));
+    await expect(client.upsertPreset('my-policy', { model: 'openai/gpt-4o-mini' })).resolves.toEqual({});
+  });
+
   it('retries 429 (honoring Retry-After) then succeeds', async () => {
     let attempts = 0;
     const { client, calls } = makeClient(async () => {

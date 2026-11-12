@@ -247,11 +247,11 @@ export class OpenRouterClient {
   upsertPreset(slug: string, config: PresetConfig): Promise<Preset> {
     const body: Record<string, unknown> = { ...config, messages: [] };
     return this.singleFlight(() =>
-      this.request<{ data: Record<string, unknown> }>(
+      this.request<{ data?: unknown }>(
         'POST',
         `/presets/${encodeURIComponent(slug)}/chat/completions`,
         body,
-      ).then((r) => mapAs<Preset>(r.data)),
+      ).then((r) => mapAs<Preset>(asRecord(r?.data))),
     );
   }
 
