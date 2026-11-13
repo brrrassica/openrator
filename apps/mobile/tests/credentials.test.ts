@@ -14,6 +14,19 @@ class FailingStore implements KeyValueStore {
   }
 }
 
+/** Store whose delete fails for one namespaced key, recording every attempt. */
+class FailingDeleteStore extends MemoryKeyValueStore {
+  readonly deleted: string[] = [];
+  constructor(private readonly failingKey: string) {
+    super();
+  }
+  async delete(key: string): Promise<void> {
+    this.deleted.push(key);
+    if (key === this.failingKey) throw new Error('delete failed');
+    return super.delete(key);
+  }
+}
+
 describe('CredentialService — never logs, format-gated', () => {
   it('roundtrips key + mgmt flag through the store', async () => {
     const svc = new CredentialService(new MemoryKeyValueStore());
@@ -77,6 +90,23 @@ describe('CredentialService — never logs, format-gated', () => {
     ).rejects.toThrow('keystore unavailable');
     // the key must NOT be reported as saved
     expect(await svc.hasKey()).toBe(false);
+  });
+
+  it('clear rejects on delete failure but still attempts every namespaced key', async () => {
+    const store = new FailingDeleteStore('provider.openrouter.key');
+    const svc = new CredentialService(store);
+    await svc.saveKey('sk-or-v1-abcdef-0123456789abcdefghij', false);
+    await svc.saveLabel('work key');
+    await svc.saveManagementKey('sk-or-v1-mgmt-key-0123456789abcdef');
+
+    await expect(svc.clear()).rejects.toThrow('delete failed');
+    // The failed key is still present, so sign-out must stay on-screen.
+    expect(await svc.getKey()).toBe('sk-or-v1-abcdef-0123456789abcdefghij');
+    // Other values were still attempted and removed.
+    expect(await svc.getLabel()).toBeNull();
+    expect(await svc.getManagementKey()).toBeNull();
+    expect(store.deleted).toContain('provider.opencode-go.key');
+    expect(store.deleted).toContain('openrator.openrouter.key');
   });
 
   it('looksLikeKey gates the documented format', () => {

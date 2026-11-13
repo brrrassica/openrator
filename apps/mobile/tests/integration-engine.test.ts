@@ -12,6 +12,7 @@ import {
   migrate,
   pruneActivityOlderThan,
   SCHEMA_VERSION,
+  setSetting,
   upsertActivityRows,
   upsertKeyRow,
   withTransaction,
@@ -119,11 +120,12 @@ const PROVIDERS: Provider[] = [
   },
 ];
 
-function makeClient() {
+function makeClient(gate?: Promise<void>) {
   return new OpenRouterClient({
     apiKey: FIXTURE_KEY,
     baseUrl: 'https://openrouter.ai/api/v1',
     fetchFn: async (input: string) => {
+      if (gate) await gate;
       if (input.includes('/key'))
         return res({
           data: {
@@ -224,6 +226,39 @@ describe('engine E2E over real SQLite (M5.4)', () => {
 
     // /models/user reflection
     expect(await getSetting(db, 'models_user_count')).toBe('2');
+  });
+
+  it('stop waits for in-flight refresh writes before sign-out wipes the cache', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const db = new NodeSqlite();
+    await migrate(db);
+    const creds = new CredentialService(new MemoryKeyValueStore());
+    await creds.saveKey(FIXTURE_KEY, true);
+    const engine = new SyncEngine(makeClient(gate), creds, db, {});
+
+    const refresh = engine.refreshAll();
+    let stopResolved = false;
+    const stopped = engine.stop().then(() => {
+      stopResolved = true;
+    });
+    await Promise.resolve();
+    expect(stopResolved).toBe(false); // the blocked network read is still tracked
+
+    release();
+    await stopped;
+    await refresh;
+    expect(await getSetting(db, 'credential.key_hash')).not.toBeNull();
+
+    // This mirrors App.onSignOut: once stop() resolves, the wipe must be final.
+    await clearAllData(db);
+    await setSetting(db, 'credential.key_hash', '');
+    await setSetting(db, 'credential.key_prefix', '');
+    expect(await getKeyRows(db)).toHaveLength(0);
+    expect(await getSetting(db, 'credential.key_hash')).toBe('');
+    expect(await getSetting(db, 'credential.key_prefix')).toBe('');
   });
 
   it('refreshAll prefers a locally saved label over the provider key label', async () => {

@@ -79,6 +79,7 @@ export class SyncEngine {
   private foreground = true;
   private running = false;
   private listeners = new Set<() => void>();
+  private readonly inFlight = new Set<Promise<unknown>>();
 
   constructor(
     source: EngineSource,
@@ -182,8 +183,25 @@ export class SyncEngine {
     return this.creds.getCredential(provider);
   }
 
+  /**
+   * Keeps a handle on every refresh so `stop()` can wait for network reads
+   * whose writes may still be pending.
+   */
+  private track<T>(work: Promise<T>): Promise<T> {
+    this.inFlight.add(work);
+    const done = () => {
+      this.inFlight.delete(work);
+    };
+    void work.then(done, done);
+    return work;
+  }
+
   /** Account + key windows + balance → keys row + settings. */
   async refreshCredits(provider: ProviderId = 'openrouter'): Promise<AccountSnapshot> {
+    return this.track(this.runRefreshCredits(provider));
+  }
+
+  private async runRefreshCredits(provider: ProviderId): Promise<AccountSnapshot> {
     const adapter = this.requireAdapter(provider);
     try {
       const credential = await this.credential(provider);
@@ -258,6 +276,10 @@ export class SyncEngine {
 
   /** No-op without a management credential or capability (spec §5.3). */
   async refreshActivity(provider: ProviderId = 'openrouter'): Promise<ActivityRow[] | null> {
+    return this.track(this.runRefreshActivity(provider));
+  }
+
+  private async runRefreshActivity(provider: ProviderId): Promise<ActivityRow[] | null> {
     const adapter = this.requireAdapter(provider);
     if (!adapter.capabilities.activityHistory || !adapter.getUsage) {
       this.touch(provider, 'activity', 'not supported');
@@ -317,6 +339,10 @@ export class SyncEngine {
   }
 
   async refreshProviders(provider: ProviderId = 'openrouter'): Promise<Provider[]> {
+    return this.track(this.runRefreshProviders(provider));
+  }
+
+  private async runRefreshProviders(provider: ProviderId): Promise<Provider[]> {
     const adapter = this.requireAdapter(provider);
     if (!adapter.capabilities.providerCatalog || !adapter.getCatalog) {
       this.touch(provider, 'providers', 'not supported');
@@ -348,6 +374,10 @@ export class SyncEngine {
   }
 
   async refreshModels(provider: ProviderId = 'openrouter'): Promise<void> {
+    return this.track(this.runRefreshModels(provider));
+  }
+
+  private async runRefreshModels(provider: ProviderId): Promise<void> {
     const adapter = this.requireAdapter(provider);
     if (!adapter.getModelCount) {
       this.touch(provider, 'models', 'not supported');
@@ -372,6 +402,10 @@ export class SyncEngine {
 
   /** One full pass for a single provider, failure-isolated per source. */
   async refreshProvider(provider: ProviderId): Promise<void> {
+    return this.track(this.runRefreshProvider(provider));
+  }
+
+  private async runRefreshProvider(provider: ProviderId): Promise<void> {
     await this.refreshCredits(provider).catch(() => undefined);
     await Promise.allSettled([
       this.refreshActivity(provider),
@@ -382,6 +416,10 @@ export class SyncEngine {
 
   /** One full pass across every configured provider. */
   async refreshAll(provider?: ProviderId): Promise<void> {
+    return this.track(this.runRefreshAll(provider));
+  }
+
+  private async runRefreshAll(provider?: ProviderId): Promise<void> {
     if (provider) {
       await this.refreshProvider(provider);
       return;
@@ -407,9 +445,18 @@ export class SyncEngine {
     this.schedule();
   }
 
-  stop(): void {
+  /**
+   * Stops scheduling and waits for refreshes already in flight. Sign-out
+   * must not wipe SQLite until those writes have landed.
+   */
+  async stop(): Promise<void> {
     this.running = false;
     this.stopTimers();
+    // A running refresh can start its next source after an await, so drain
+    // until no tracked work remains instead of snapshotting once.
+    while (this.inFlight.size > 0) {
+      await Promise.allSettled(Array.from(this.inFlight));
+    }
   }
 
   private stopTimers(): void {
