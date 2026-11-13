@@ -13,7 +13,7 @@ export const POLL = {
   SNAPSHOT_DAILY_MS: 24 * 60 * 60_000,
   /** Client request timeout. */
   REQUEST_TIMEOUT_MS: 20_000,
-  /** Retries for retriable failures (429/5xx/network). */
+  /** Retries for retriable failures (429/5xx/network) on idempotent requests. */
   MAX_RETRIES: 2,
   /** On-device cache retention for activity rows. */
   ACTIVITY_RETENTION_DAYS: 35,

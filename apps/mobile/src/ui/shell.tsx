@@ -44,7 +44,7 @@ interface Props {
   engine: SyncEngine;
   db: SqlDb;
   creds: CredentialService;
-  onSignOut?: () => void;
+  onSignOut?: () => void | Promise<void>;
   onAccountsChanged?: () => void;
 }
 

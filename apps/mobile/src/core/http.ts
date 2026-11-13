@@ -2,8 +2,8 @@
  * OpenRator — shared HTTP transport (M7.3).
  *
  * Extracted from OpenRouterClient so every provider adapter inherits the same
- * timeout, single-flight queue, retry/backoff and error mapping. Raw keys only
- * ever appear in the Authorization header.
+ * timeout, single-flight queue, retry/backoff (idempotent methods only) and
+ * error mapping. Raw keys only ever appear in the Authorization header.
  */
 
 import { POLL } from './config';
@@ -37,6 +37,16 @@ function isAbortError(e: unknown): boolean {
     e !== null &&
     (e as { name?: unknown }).name === 'AbortError'
   );
+}
+
+/**
+ * Only idempotent methods may be replayed. A timeout or 5xx on a write may
+ * have already committed server-side (e.g. POST /keys minting a key), so
+ * retrying it can duplicate the side effect or lose a one-time secret.
+ */
+export function isRetryableMethod(method: string): boolean {
+  const m = method.toUpperCase();
+  return m === 'GET' || m === 'HEAD' || m === 'OPTIONS';
 }
 
 /**
@@ -80,8 +90,9 @@ export class HttpClient {
       throw new OpenRouterNetworkError('refusing to send credentials to a different origin');
     }
     const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
+    const maxAttempts = isRetryableMethod(method) ? this.maxRetries + 1 : 1;
     let lastErr: Error | undefined;
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) {
         const retryAfterMs =
           lastErr instanceof OpenRouterApiError ? lastErr.retryAfterMs : undefined;

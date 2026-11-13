@@ -160,6 +160,45 @@ describe('OpenRouterClient', () => {
     await expect(client.upsertPreset('my-policy', { model: 'openai/gpt-4o-mini' })).resolves.toEqual({});
   });
 
+  it('does not retry POST createAdminKey on a 5xx (ambiguous write outcome)', async () => {
+    let attempts = 0;
+    const { client, calls } = makeClient(async () => {
+      attempts++;
+      return res(503, { error: { message: 'Unavailable', code: 503 } });
+    });
+    await expect(client.createAdminKey({ label: 'orphan' })).rejects.toBeInstanceOf(
+      OpenRouterApiError,
+    );
+    expect(attempts).toBe(1);
+    expect(calls()).toHaveLength(1);
+  });
+
+  it('does not retry preset upsert on a network error', async () => {
+    let attempts = 0;
+    const { client, calls } = makeClient(async () => {
+      attempts++;
+      throw new Error('Network request failed');
+    });
+    await expect(
+      client.upsertPreset('my-policy', { model: 'openai/gpt-4o-mini' }),
+    ).rejects.toThrow('Network request failed');
+    expect(attempts).toBe(1);
+    expect(calls()).toHaveLength(1);
+  });
+
+  it('does not retry DELETE admin key on a 5xx', async () => {
+    let attempts = 0;
+    const { client, calls } = makeClient(async () => {
+      attempts++;
+      return res(500, { error: { message: 'Server error', code: 500 } });
+    });
+    await expect(client.deleteAdminKey('sk-or-v1-abc')).rejects.toBeInstanceOf(
+      OpenRouterApiError,
+    );
+    expect(attempts).toBe(1);
+    expect(calls()).toHaveLength(1);
+  });
+
   it('retries 429 (honoring Retry-After) then succeeds', async () => {
     let attempts = 0;
     const { client, calls } = makeClient(async () => {

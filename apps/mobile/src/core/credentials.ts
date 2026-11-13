@@ -126,10 +126,19 @@ export class CredentialService {
     return null;
   }
 
+  /**
+   * The stored flag saying the primary key itself is a management key.
+   * Unlike `isManagementKey`, this does not infer true from a separate
+   * management credential, so re-saving a primary key can preserve it.
+   */
+  async isManagementFlag(provider: ProviderId = 'openrouter'): Promise<boolean> {
+    return (await this.store.get(flagName(provider))) === '1';
+  }
+
   /** Highest-confidence management flag: management key or persisted toggle. */
   async isManagementKey(provider: ProviderId = 'openrouter'): Promise<boolean> {
     if ((await this.getManagementKey(provider)) !== null) return true;
-    if ((await this.store.get(flagName(provider))) === '1') return true;
+    if (await this.isManagementFlag(provider)) return true;
     if (provider === 'openrouter') {
       return (await this.store.get(LEGACY_MGMT)) === '1';
     }

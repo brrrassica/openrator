@@ -24,7 +24,7 @@ interface Props {
   db: SqlDb;
   creds: CredentialService;
   onAccountsChanged?: () => void;
-  onSignOut?: () => void;
+  onSignOut?: () => void | Promise<void>;
 }
 
 export default function AccountsPane({
@@ -40,8 +40,10 @@ export default function AccountsPane({
   const [selected, setSelected] = useState<ProviderId>(providers[0]?.id ?? 'openrouter');
   const [key, setKey] = useState('');
   const [mgmtKey, setMgmtKey] = useState('');
+  const [hasStoredMgmt, setHasStoredMgmt] = useState(false);
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manualAmount, setManualAmount] = useState('');
   const [manualSaved, setManualSaved] = useState(false);
@@ -84,6 +86,22 @@ export default function AccountsPane({
     };
   }, [db, selected, month]);
 
+  // Load the stored credential state for the selected provider. The secret
+  // is never pre-filled, but the pane must know whether a management key is
+  // already stored so a blank field does not erase it.
+  useEffect(() => {
+    let cancel = false;
+    setMgmtKey('');
+    (async () => {
+      const storedMgmt = await creds.getManagementKey(selected);
+      if (cancel) return;
+      setHasStoredMgmt(storedMgmt !== null);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [creds, selected]);
+
   const add = async () => {
     if (busy || !descriptor) return;
     if (!descriptor.keyPattern.test(key.trim())) {
@@ -93,13 +111,32 @@ export default function AccountsPane({
     setBusy(true);
     setError(null);
     try {
-      await creds.saveKey(key, false, selected);
-      if (descriptor.supportsManagementKey) {
-        await creds.saveManagementKey(mgmtKey.trim(), selected);
+      const managementKey = mgmtKey.trim();
+      const isManagement = await creds.isManagementFlag(selected);
+      await creds.saveKey(key, isManagement, selected);
+      if (descriptor.supportsManagementKey && managementKey) {
+        await creds.saveManagementKey(managementKey, selected);
+        setHasStoredMgmt(true);
       }
       setKey('');
       setMgmtKey('');
       await load();
+      onAccountsChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeManagementKey = async () => {
+    if (busy || !descriptor) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await creds.saveManagementKey(null, selected);
+      setHasStoredMgmt(false);
+      setMgmtKey('');
       onAccountsChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -145,14 +182,29 @@ export default function AccountsPane({
     }
   };
 
+  const signOut = async () => {
+    if (!onSignOut || signingOut) return;
+    setSigningOut(true);
+    setError(null);
+    try {
+      await onSignOut();
+    } catch (e) {
+      // Keep the user on the current screen: a partial teardown must be
+      // visible instead of silently dropping them on onboarding.
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
   const confirmSignOut = () => {
-    if (!onSignOut) return;
+    if (!onSignOut || signingOut) return;
     Alert.alert(
       'Sign out all providers?',
       'This removes every credential and wipes cached usage data from this device.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign out', style: 'destructive', onPress: onSignOut },
+        { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
       ],
     );
   };
@@ -225,16 +277,39 @@ export default function AccountsPane({
           autoCorrect={false}
         />
         {descriptor?.supportsManagementKey ? (
-          <TextInput
-            style={[styles.input, { color: t.text, borderColor: t.border, backgroundColor: t.bg }]}
-            value={mgmtKey}
-            onChangeText={setMgmtKey}
-            placeholder="management key (optional)"
-            placeholderTextColor={t.subtext}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          <>
+            <TextInput
+              style={[styles.input, { color: t.text, borderColor: t.border, backgroundColor: t.bg }]}
+              value={mgmtKey}
+              onChangeText={setMgmtKey}
+              placeholder={
+                hasStoredMgmt
+                  ? 'management key saved — enter a new one to replace'
+                  : 'management key (optional)'
+              }
+              placeholderTextColor={t.subtext}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {hasStoredMgmt ? (
+              <View style={styles.mgmtRow}>
+                <Text style={{ color: t.subtext, fontSize: 11, flex: 1 }}>
+                  Management key stored on this device.
+                </Text>
+                <Pressable
+                  style={[styles.segment, { borderColor: t.warn, marginRight: 0 }]}
+                  onPress={() => void removeManagementKey()}
+                  disabled={busy}
+                  accessibilityRole="button"
+                >
+                  <Text style={{ color: t.warn, fontSize: 12, fontWeight: '700' }}>
+                    remove
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </>
         ) : null}
         {error ? <Text style={{ color: t.warn, fontSize: 12, marginTop: 6 }}>{error}</Text> : null}
         <Pressable
@@ -303,10 +378,11 @@ export default function AccountsPane({
           <Pressable
             style={[styles.segment, { borderColor: t.danger, alignSelf: 'flex-start', marginTop: 10 }]}
             onPress={confirmSignOut}
+            disabled={signingOut}
             accessibilityRole="button"
           >
             <Text style={{ color: t.danger, fontSize: 12, fontWeight: '700' }}>
-              sign out all providers
+              {signingOut ? 'signing out…' : 'sign out all providers'}
             </Text>
           </Pressable>
         ) : null}
@@ -327,6 +403,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#8888',
   },
   providerRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
+  mgmtRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   segment: {
     borderWidth: 1,
     borderRadius: 8,
