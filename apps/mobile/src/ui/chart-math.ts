@@ -112,3 +112,12 @@ export function limitLabel(remaining: number, limit: number): string {
   if (!Number.isFinite(limit) || limit === 0) return 'unlimited';
   return `${remaining.toFixed(2)} / ${limit.toFixed(2)}`;
 }
+
+/**
+ * Remaining-budget subline. A limit of 0 is the provider "unlimited" sentinel,
+ * so there is no remaining balance to format as USD.
+ */
+export function limitRemainingLabel(remaining: number, limit: number): string {
+  if (!Number.isFinite(limit) || limit === 0) return 'No key limit';
+  return `${fmtUsd(remaining)} remaining`;
+}

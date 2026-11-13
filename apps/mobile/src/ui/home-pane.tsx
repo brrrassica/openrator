@@ -32,7 +32,7 @@ import { getDescriptor } from '../providers/registry';
 import { PLAN_WINDOW_LABELS, PLAN_WINDOW_ORDER } from '../providers/opencode/common';
 import { combineKeyRows, sumCredits } from './aggregate';
 import { computeHomeSummary, HomeSummary, problemProviders, resetLabel } from './home-summary';
-import { fmtCount, fmtUsd, limitLabel } from './chart-math';
+import { fmtCount, fmtUsd, limitLabel, limitRemainingLabel } from './chart-math';
 import { BarRows, ResponsiveAreaChart } from './primitives';
 import { useTheme } from './theme';
 
@@ -314,20 +314,21 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
           {summary.limit > 0 ? limitLabel(summary.limitRemaining, summary.limit) : 'Unlimited'}
         </Text>
         <Text style={{ color: t.subtext, fontSize: 13 }}>
-          {fmtUsd(summary.limitRemaining)} remaining · {fmtUsd(summary.usageDaily)} spent today
+          {limitRemainingLabel(summary.limitRemaining, summary.limit)} ·{' '}
+          {fmtUsd(summary.usageDaily)} spent today
         </Text>
-        <View style={[styles.limitTrack, { backgroundColor: t.border }]}>
-          <View
-            style={{
-              width: `${summary.limit > 0 ? Math.min(100, (summary.limitRemaining / summary.limit) * 100) : 100}%`,
-              ...styles.limitFill,
-              backgroundColor:
-                summary.limit > 0 && summary.limitRemaining / summary.limit < 0.1
-                  ? t.danger
-                  : t.ok,
-            }}
-          />
-        </View>
+        {summary.limit > 0 ? (
+          <View style={[styles.limitTrack, { backgroundColor: t.border }]}>
+            <View
+              style={{
+                width: `${Math.min(100, (summary.limitRemaining / summary.limit) * 100)}%`,
+                ...styles.limitFill,
+                backgroundColor:
+                  summary.limitRemaining / summary.limit < 0.1 ? t.danger : t.ok,
+              }}
+            />
+          </View>
+        ) : null}
         <View style={styles.windowRow}>
           <WindowStat label="today" value={fmtUsd(summary.usageDaily)} />
           <WindowStat label="this month" value={fmtUsd(summary.usageMonthly)} />
