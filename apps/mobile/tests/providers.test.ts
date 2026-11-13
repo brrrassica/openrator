@@ -378,5 +378,13 @@ describe('aggregate math (M7.8)', () => {
     expect(combined?.limit).toBe(15);
     expect(combined?.limitRemaining).toBe(6);
     expect(combined?.usageMonthly).toBe(9);
+
+    const mixedUnlimited = combineKeyRows([
+      key('openrouter', 20, 12),
+      key('opencode-zen', 0, 0),
+    ]);
+    expect(mixedUnlimited?.limit).toBe(0);
+    expect(mixedUnlimited?.limitRemaining).toBe(0);
+    expect(mixedUnlimited?.usageMonthly).toBe(8);
   });
 });

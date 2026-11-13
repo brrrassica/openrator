@@ -28,8 +28,9 @@ export function sumCredits(
 }
 
 /**
- * Combine per-provider key rows for the aggregate card. Limits and usage sum;
- * the label is explicit and mixed reset windows collapse to null.
+ * Combine per-provider key rows for the aggregate card. Finite limits and usage
+ * sum, but an unlimited (0) limit absorbs the total; the label is explicit and
+ * mixed reset windows collapse to null.
  */
 export function combineKeyRows(rows: KeyRow[], label = 'All providers'): KeyRow | null {
   if (rows.length === 0) return null;
@@ -41,13 +42,16 @@ export function combineKeyRows(rows: KeyRow[], label = 'All providers'): KeyRow 
     .map((r) => r.expiresAt)
     .filter((x): x is string => Boolean(x))
     .sort()[0] ?? null;
+  // A limit of 0 means unlimited, so one unlimited row makes the whole
+  // combined scope unlimited rather than summing it away as zero.
+  const unlimited = rows.some((r) => r.limit === 0);
   return {
     provider: 'all',
     hash: 'aggregate',
     label,
     isManagement: rows.some((r) => r.isManagement) ? 1 : 0,
-    limit: rows.reduce((s, r) => s + r.limit, 0),
-    limitRemaining: rows.reduce((s, r) => s + r.limitRemaining, 0),
+    limit: unlimited ? 0 : rows.reduce((s, r) => s + r.limit, 0),
+    limitRemaining: unlimited ? 0 : rows.reduce((s, r) => s + r.limitRemaining, 0),
     limitReset: reset,
     usageMonthly: rows.reduce((s, r) => s + r.usageMonthly, 0),
     usageDaily: rows.reduce((s, r) => s + r.usageDaily, 0),
