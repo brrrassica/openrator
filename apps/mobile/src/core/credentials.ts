@@ -67,11 +67,9 @@ export async function createSecureKeyValueStore(): Promise<KeyValueStore> {
     },
     async delete(key: string) {
       if (!impl) return;
-      try {
-        await impl.deleteItemAsync(key);
-      } catch {
-        // no-op
-      }
+      // Like `set`, a failed delete must surface: sign-out cannot claim the
+      // credential was removed while it is still on the device.
+      await impl.deleteItemAsync(key);
     },
   };
 }
@@ -180,16 +178,41 @@ export class CredentialService {
   // ---- lifecycle -----------------------------------------------------------
 
   async clearProvider(provider: ProviderId): Promise<void> {
-    await this.store.delete(keyName(provider));
-    await this.store.delete(mgmtName(provider));
-    await this.store.delete(labelName(provider));
-    await this.store.delete(flagName(provider));
+    // Attempt every namespaced value even if one delete fails.
+    const results = await Promise.allSettled([
+      this.store.delete(keyName(provider)),
+      this.store.delete(mgmtName(provider)),
+      this.store.delete(labelName(provider)),
+      this.store.delete(flagName(provider)),
+    ]);
+    const failed = results.find(
+      (r): r is PromiseRejectedResult => r.status === 'rejected',
+    );
+    if (failed) throw failed.reason;
   }
 
   async clear(): Promise<void> {
-    for (const provider of PROVIDER_IDS) await this.clearProvider(provider);
-    await this.store.delete(LEGACY_KEY);
-    await this.store.delete(LEGACY_MGMT);
+    const failures: unknown[] = [];
+    for (const provider of PROVIDER_IDS) {
+      try {
+        await this.clearProvider(provider);
+      } catch (e) {
+        failures.push(e);
+      }
+    }
+    for (const legacy of [LEGACY_KEY, LEGACY_MGMT]) {
+      try {
+        await this.store.delete(legacy);
+      } catch (e) {
+        failures.push(e);
+      }
+    }
+    if (failures.length > 0) {
+      const details = failures
+        .map((e) => (e instanceof Error ? e.message : String(e)))
+        .join('; ');
+      throw new Error(`Failed to remove credentials from secure storage: ${details}`);
+    }
   }
 
   async providersWithKeys(): Promise<ProviderId[]> {

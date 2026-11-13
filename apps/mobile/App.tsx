@@ -168,7 +168,7 @@ function Inner() {
 
   if (stage === 'ready' && engine && ctx) {
     const rebuild = async () => {
-      engine.stop();
+      await engine.stop();
       const providers = await ctx.creds.providersWithKeys();
       if (providers.length === 0) {
         setEngine(null);
@@ -187,7 +187,7 @@ function Inner() {
         creds={ctx.creds}
         onAccountsChanged={() => void rebuild()}
         onSignOut={async () => {
-          engine.stop();
+          await engine.stop();
           try {
             await ctx.creds.clear();
             await clearAllData(ctx.db);
