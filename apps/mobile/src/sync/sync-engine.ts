@@ -32,7 +32,7 @@ import {
 } from '../providers/types';
 import { fixedOpenRouterAdapter } from '../providers/openrouter/adapter';
 
-export type SourceName = 'credits' | 'activity' | 'providers' | 'models';
+export type SourceName = 'credits' | 'balance' | 'activity' | 'providers' | 'models';
 
 export interface SyncStatus {
   [source: string]: { lastOkAt?: number; error?: string; stalenessMs: number };
@@ -225,7 +225,8 @@ export class SyncEngine {
         updatedAt: snapshot.updatedAt,
       });
 
-      if (snapshot.balanceTotal !== undefined) {
+      const hasBalance = snapshot.balanceTotal !== undefined;
+      if (hasBalance) {
         await setProviderSetting(
           this.db,
           provider,
@@ -258,10 +259,19 @@ export class SyncEngine {
       if (provider === 'openrouter') {
         await setSetting(this.db, 'credential.key_hash', snapshot.fingerprint);
         await setSetting(this.db, 'credential.key_prefix', snapshot.fingerprint.slice(0, 9));
-        if (snapshot.balanceTotal !== undefined) {
+        if (hasBalance) {
           await setSetting(this.db, 'account.total_credits', String(snapshot.balanceTotal));
           await setSetting(this.db, 'account.total_usage', String(snapshot.balanceUsage ?? 0));
         }
+      }
+
+      // /key and /credits are separate benefits: a successful key refresh
+      // must not make an unavailable or failed balance look fresh. Cached
+      // values stay in SQLite and are marked stale until /credits succeeds.
+      if (hasBalance) {
+        this.touch(provider, 'balance');
+      } else if (adapter.capabilities.accountBalance) {
+        this.touch(provider, 'balance', 'balance unavailable');
       }
 
       this.touch(provider, 'credits');

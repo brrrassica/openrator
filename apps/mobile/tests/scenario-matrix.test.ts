@@ -5,6 +5,7 @@ import {
   getActivityRows,
   getDailyRollups,
   getKeyRow,
+  getProviderSetting,
   getSetting,
   listProvidersFromDb,
   migrate,
@@ -78,6 +79,8 @@ interface ServerState {
   keyStatus?: number;
   /** Force an HTTP status for /activity (e.g. 429/500). */
   activityStatus?: number;
+  /** Force an HTTP status for /credits (e.g. 403). */
+  creditsStatus?: number;
   /** Force the preset write to fail (500). */
   presetWriteFails?: boolean;
   /** Override the /activity payload with malformed fixtures. */
@@ -218,6 +221,12 @@ function makeServer(initial: Partial<ServerState> = {}): Server {
     }
 
     if (path.endsWith('/credits')) {
+      if (state.creditsStatus) {
+        return jsonRes(
+          { error: { message: 'Only management keys can fetch credits', code: state.creditsStatus } },
+          state.creditsStatus,
+        );
+      }
       return jsonRes({ data: { total_credits: 65, total_usage: 48.54 } });
     }
 
@@ -336,6 +345,48 @@ describe('scenario matrix — management key persona', () => {
 
     // management plane is reachable with a management key
     expect(server.log.some((l) => l.includes('/activity'))).toBe(true);
+  });
+
+  it('403 on /credits keeps /key fresh but leaves the balance unknown', async () => {
+    const server = makeServer({ persona: 'mgmt', creditsStatus: 403 });
+    const { db, engine } = await setup(server);
+    await engine.refreshAll();
+
+    // /key succeeded, so the key card is real data.
+    expect(engine.getStatus().credits.lastOkAt).toBeTypeOf('number');
+    expect(await getKeyRow(db, (await getSetting(db, 'credential.key_hash')) ?? '')).not.toBeNull();
+    expect(engine.getStatus().balance.error).toBeTruthy();
+    expect(await getProviderSetting(db, 'openrouter', 'account.total_credits')).toBeNull();
+    expect(await getSetting(db, 'account.total_credits')).toBeNull();
+
+    // No balance was ever persisted, so Home hides the credits card.
+    const home = computeHomeSummary({
+      key: null,
+      rollups: [],
+      providers: [],
+      today: TODAY,
+      staleCredits: true,
+      activityLocked: false,
+    });
+    expect(home.creditsKnown).toBe(false);
+  });
+
+  it('a failed /credits refresh keeps the cached balance but marks it stale', async () => {
+    const server = makeServer({ persona: 'mgmt' });
+    const { db, engine } = await setup(server);
+    await engine.refreshAll();
+
+    const firstOkAt = engine.getStatus().balance.lastOkAt;
+    expect(firstOkAt).toBeTypeOf('number');
+    expect(await getProviderSetting(db, 'openrouter', 'account.total_credits')).toBe('65');
+
+    server.state.creditsStatus = 403;
+    await engine.refreshAll();
+
+    expect(engine.getStatus().credits.lastOkAt).toBeTypeOf('number');
+    expect(engine.getStatus().balance.error).toBeTruthy();
+    expect(engine.getStatus().balance.lastOkAt).toBe(firstOkAt);
+    expect(await getProviderSetting(db, 'openrouter', 'account.total_credits')).toBe('65');
   });
 
   it('Keys CRUD works and the one-time secret never reaches storage', async () => {

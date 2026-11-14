@@ -22,6 +22,8 @@ export interface HomeSummary {
   creditsTotal: number;
   creditsUsage: number;
   creditsRemaining: number;
+  /** True only when an account total was actually persisted. */
+  creditsKnown: boolean;
   label: string;
   limit: number;
   limitRemaining: number;
@@ -60,6 +62,7 @@ const RESET_LABEL: Record<string, string> = {
 
 export function computeHomeSummary(inputs: HomeInputs): HomeSummary {
   const { key, rollups, providers, today, staleCredits } = inputs;
+  const creditsKnown = inputs.creditsTotal !== undefined;
   const creditsTotal = inputs.creditsTotal ?? 0;
   const creditsUsage = inputs.creditsUsage ?? 0;
   const creditsRemaining = creditsTotal - creditsUsage;
@@ -108,6 +111,7 @@ export function computeHomeSummary(inputs: HomeInputs): HomeSummary {
     creditsTotal,
     creditsUsage,
     creditsRemaining,
+    creditsKnown,
     label: key?.label ?? 'key',
     limit: key?.limit ?? 0,
     limitRemaining: key?.limitRemaining ?? 0,

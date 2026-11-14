@@ -460,6 +460,25 @@ describe('engine E2E over real SQLite (M5.4)', () => {
     expect(providers.every((p) => typeof p.lastOkAt === 'string')).toBe(true);
   });
 
+  it('provider-scoped clear also removes legacy OpenRouter globals', async () => {
+    const { db, engine } = await makeEngine();
+    await engine.refreshAll();
+    expect(await getSetting(db, 'account.total_credits')).not.toBeNull();
+    expect(await getSetting(db, 'models_user_count')).not.toBeNull();
+    expect(await getSetting(db, 'credential.key_hash')).not.toBeNull();
+
+    await clearAllData(db, 'openrouter');
+
+    expect(await getKeyRows(db, 'openrouter')).toHaveLength(0);
+    expect(await getActivityRows(db, { provider: 'openrouter' })).toHaveLength(0);
+    expect(await getDailyRollups(db, undefined, undefined, 'openrouter')).toHaveLength(0);
+    expect(await getSetting(db, 'account.total_credits')).toBeNull();
+    expect(await getSetting(db, 'account.total_usage')).toBeNull();
+    expect(await getSetting(db, 'models_user_count')).toBeNull();
+    expect(await getSetting(db, 'credential.key_hash')).toBeNull();
+    expect(await getSetting(db, 'credential.key_prefix')).toBeNull();
+  });
+
   it('clearAllData wipes cached usage data on sign-out', async () => {
     const { db, engine } = await makeEngine();
     await engine.refreshAll();
