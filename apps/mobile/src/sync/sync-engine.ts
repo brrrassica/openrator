@@ -9,10 +9,15 @@
 import { ACTIVITY_WINDOW_DAYS, POLL } from '../core/config';
 import { OpenRouterClient } from '../core/client';
 import { CredentialService } from '../core/credentials';
-import { planInfoSettingEntries, planWindowSettingEntries } from '../core/plan';
+import {
+  PLAN_SETTING_PREFIX,
+  planInfoSettingEntries,
+  planWindowSettingEntries,
+} from '../core/plan';
 import { addDays, computeDailyRollups, fmtDay } from './rollups';
 import { SqlDb } from '../store/db';
 import {
+  deleteProviderSettings,
   getActivityRows,
   pruneActivityOlderThan,
   replaceDailyRollups,
@@ -244,7 +249,14 @@ export class SyncEngine {
       await setProviderSetting(this.db, provider, 'account.label', snapshot.label);
 
       // M8: subscription plans (OpenCode Go) persist percent windows so the
-      // Home pane can render them after an app restart / offline.
+      // Home pane can render them after an app restart / offline. Invalidate
+      // the cached windows first: a response that omits a meter (or changes
+      // shape) must remove its old percentage instead of leaving it on Home.
+      await deleteProviderSettings(
+        this.db,
+        provider,
+        `${PLAN_SETTING_PREFIX}.window.`,
+      );
       if (snapshot.plan) {
         for (const entry of planInfoSettingEntries(snapshot.plan)) {
           await setProviderSetting(this.db, provider, entry.key, entry.value);

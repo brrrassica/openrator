@@ -258,4 +258,61 @@ describe('sync engine persists OpenCode Go plan windows (M8)', () => {
     ).toBe('33.3');
     expect(engine.getStatus('opencode-go').credits?.error).toBeUndefined();
   });
+
+  it('clears cached windows that disappear from the latest snapshot', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    const creds = new CredentialService(new MemoryKeyValueStore());
+    await creds.saveKey('go-fixture-key-0123456789', false, 'opencode-go');
+
+    const full = new OpenCodeGoAdapter({
+      account: { label: 'Go fixture' },
+      plan: {
+        name: 'OpenCode Go Pro',
+        status: 'active',
+        windows: [
+          { window: 'five_hour', usedPct: 100 },
+          { window: 'weekly', usedPct: 55 },
+          { window: 'monthly', usedPct: 25 },
+        ],
+      },
+    });
+    await new SyncEngine([full], creds, db, {}).refreshCredits('opencode-go');
+    expect(
+      await getProviderSetting(db, 'opencode-go', 'plan.window.monthly.used_pct'),
+    ).toBe('25');
+
+    // A later response omits weekly/monthly: those stale percentages must go.
+    const fewer = new OpenCodeGoAdapter({
+      account: { label: 'Go fixture' },
+      plan: {
+        name: 'OpenCode Go Pro',
+        status: 'active',
+        windows: [{ window: 'five_hour', usedPct: 10 }],
+      },
+    });
+    await new SyncEngine([fewer], creds, db, {}).refreshCredits('opencode-go');
+    expect(
+      await getProviderSetting(db, 'opencode-go', 'plan.window.five_hour.used_pct'),
+    ).toBe('10');
+    expect(
+      await getProviderSetting(db, 'opencode-go', 'plan.window.weekly.used_pct'),
+    ).toBeNull();
+    expect(
+      await getProviderSetting(db, 'opencode-go', 'plan.window.monthly.used_pct'),
+    ).toBeNull();
+    expect(
+      await getProviderSetting(db, 'opencode-go', 'plan.window.monthly.resets_at'),
+    ).toBeNull();
+
+    // An empty live snapshot clears every window rather than freezing Home.
+    const empty = new OpenCodeGoAdapter({
+      account: { label: 'Go fixture' },
+      plan: { name: 'OpenCode Go Pro', status: 'active', windows: [] },
+    });
+    await new SyncEngine([empty], creds, db, {}).refreshCredits('opencode-go');
+    expect(
+      await getProviderSetting(db, 'opencode-go', 'plan.window.five_hour.used_pct'),
+    ).toBeNull();
+  });
 });
