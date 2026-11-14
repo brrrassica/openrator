@@ -186,6 +186,7 @@ describe('computeHomeSummary', () => {
       creditsTotal: 20,
       creditsUsage: 7.5,
     });
+    expect(s.creditsKnown).toBe(true);
     expect(s.creditsTotal).toBe(20);
     expect(s.creditsUsage).toBe(7.5);
     expect(s.creditsRemaining).toBeCloseTo(12.5);
@@ -200,6 +201,7 @@ describe('computeHomeSummary', () => {
       staleCredits: false,
       activityLocked: false,
     });
+    expect(s.creditsKnown).toBe(false);
     expect(s.creditsTotal).toBe(0);
     expect(s.creditsUsage).toBe(0);
     expect(s.creditsRemaining).toBe(0);

@@ -171,11 +171,19 @@ export default function AccountsPane({
     setBusy(true);
     setError(null);
     try {
+      // Drain in-flight refreshes before deleting the credential and cache:
+      // a refresh that already read the credential can otherwise write key
+      // rows, settings, activity, or rollups back after the wipe. The rebuild
+      // triggered by onAccountsChanged starts a fresh engine afterwards.
+      await engine.stop();
       await creds.clearProvider(id);
       await clearAllData(db, id);
       await load();
       onAccountsChanged?.();
     } catch (e) {
+      // The engine may already be stopped when a teardown step throws; keep
+      // background sync for the remaining providers alive.
+      engine.start(true);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);

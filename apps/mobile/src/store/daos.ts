@@ -244,8 +244,9 @@ export async function withTransaction<T>(db: SqlDb, fn: () => Promise<T>): Promi
 
 /**
  * Wipe cached usage data on sign-out (spec §6.2). With a provider argument
- * only that provider's rows are removed; without one every provider is wiped.
- * Credential settings are cleared separately after the secure store empties.
+ * only that provider's rows are removed (plus the v0.1 global OpenRouter
+ * settings it used); without one every provider is wiped. Credential settings
+ * are cleared separately after the secure store empties.
  */
 export async function clearAllData(db: SqlDb, provider?: ProviderId): Promise<void> {
   const where = provider ? ' WHERE provider = ?' : '';
@@ -255,6 +256,17 @@ export async function clearAllData(db: SqlDb, provider?: ProviderId): Promise<vo
   }
   if (provider) {
     await db.runAsync('DELETE FROM settings WHERE key LIKE ?', `provider.${provider}.%`);
+    // v0.1 only persisted OpenRouter account/cache settings globally and Home
+    // still reads them as a fallback. Remove them with the provider so a
+    // re-added account cannot display the previous key or balance.
+    if (provider === 'openrouter') {
+      await db.runAsync(
+        `DELETE FROM settings WHERE key IN (
+           'account.total_credits', 'account.total_usage', 'models_user_count',
+           'credential.key_hash', 'credential.key_prefix'
+         )`,
+      );
+    }
   } else {
     await db.runAsync("DELETE FROM settings WHERE key NOT LIKE 'credential.%'");
   }

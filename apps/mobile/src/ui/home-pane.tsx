@@ -57,8 +57,8 @@ interface HomeData {
   rollups: DailyRollup[];
   providers: Provider[];
   today: string;
-  creditsTotal: number;
-  creditsUsage: number;
+  creditsTotal?: number;
+  creditsUsage?: number;
   plans: ScopedPlan[];
   manual: ManualRow[];
 }
@@ -92,9 +92,12 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
             id === 'openrouter' && usage === null
               ? await getSetting(db, 'account.total_usage')
               : usage;
+          const totalNum = legacyTotal === null ? undefined : Number(legacyTotal);
+          const usageNum = legacyUsage === null ? undefined : Number(legacyUsage);
           return {
-            total: Number(legacyTotal ?? 0) || 0,
-            usage: Number(legacyUsage ?? 0) || 0,
+            total:
+              totalNum !== undefined && Number.isFinite(totalNum) ? totalNum : undefined,
+            usage: usageNum !== undefined && Number.isFinite(usageNum) ? usageNum : 0,
           };
         }),
       );
@@ -133,14 +136,15 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
           : keyRows[0] ?? null;
       const today = new Date().toISOString().slice(0, 10);
       const totals = sumCredits(credits);
+      const creditsKnown = credits.some((c) => c.total !== undefined);
       if (mounted.current) {
         setData({
           key,
           rollups,
           providers,
           today,
-          creditsTotal: totals.total,
-          creditsUsage: totals.usage,
+          creditsTotal: creditsKnown ? totals.total : undefined,
+          creditsUsage: creditsKnown ? totals.usage : undefined,
           plans,
           manual,
         });
@@ -179,13 +183,15 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
 
   const scopeIds = provider === 'all' ? engine.getProviders() : [provider];
   const statuses = scopeIds.map((id) => engine.getStatus(id));
-  const staleCredits = isScopeStale(
-    engine,
-    scopeIds,
-    'credits',
-    'accountBalance',
-    POLL.CREDITS_FOREGROUND_MS * 2,
-  );
+  const staleCredits =
+    statuses.some((s) => s.balance?.error !== undefined) ||
+    isScopeStale(
+      engine,
+      scopeIds,
+      'balance',
+      'accountBalance',
+      POLL.CREDITS_FOREGROUND_MS * 2,
+    );
   const activityLocked =
     scopeIds.length > 0 &&
     statuses.every((s) => s.activity?.error === 'management key required');
@@ -205,9 +211,10 @@ export default function HomePane({ engine, db, provider = 'all' }: Props) {
   const manualProviders = provider === 'all' ? scopeIds : [provider];
   const manualCapable = manualProviders.filter((id) => engine.getCapabilities(id)?.manualBudget);
   const showCredits =
-    provider === 'all'
+    summary.creditsKnown &&
+    (provider === 'all'
       ? scopeIds.some((id) => engine.getCapabilities(id)?.accountBalance)
-      : Boolean(engine.getCapabilities(provider)?.accountBalance);
+      : Boolean(engine.getCapabilities(provider)?.accountBalance));
   const showKeyCard =
     provider === 'all' ? true : Boolean(engine.getCapabilities(provider)?.spendWindows);
   const manualTotal = data.manual.reduce((s, m) => s + m.amountUsd, 0);
