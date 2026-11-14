@@ -7,6 +7,7 @@ import {
   fmtCount,
   fmtUsd,
   limitLabel,
+  limitRemainingLabel,
   linePath,
 } from '../src/ui/chart-math';
 
@@ -110,5 +111,11 @@ describe('formatters', () => {
     expect(limitLabel(3.2, 4)).toBe('3.20 / 4.00');
     expect(limitLabel(2, 0)).toBe('unlimited');
     expect(limitLabel(Number.NaN, 0)).toBe('unlimited');
+  });
+
+  it('limitRemainingLabel: no key limit for zero/non-finite, else USD remaining', () => {
+    expect(limitRemainingLabel(3.2, 4)).toBe('$3.20 remaining');
+    expect(limitRemainingLabel(0, 0)).toBe('No key limit');
+    expect(limitRemainingLabel(0, Number.NaN)).toBe('No key limit');
   });
 });
