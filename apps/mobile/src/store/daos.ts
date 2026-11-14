@@ -317,6 +317,32 @@ export async function setProviderSetting(
   await writeSetting(db, providerSettingKey(provider, key), value);
 }
 
+async function deleteProviderSettingsInTransaction(
+  db: SqlDb,
+  provider: ProviderId,
+  keyPrefix = '',
+): Promise<void> {
+  await db.runAsync(
+    'DELETE FROM settings WHERE key LIKE ?',
+    `${providerSettingKey(provider, keyPrefix)}%`,
+  );
+}
+
+/**
+ * Deletes the provider's namespaced settings (or only those under
+ * `keyPrefix`). Used to invalidate cached account/plan values when their
+ * source snapshot no longer contains them.
+ */
+export async function deleteProviderSettings(
+  db: SqlDb,
+  provider: ProviderId,
+  keyPrefix = '',
+): Promise<void> {
+  await withTransaction(db, async () => {
+    await deleteProviderSettingsInTransaction(db, provider, keyPrefix);
+  });
+}
+
 // ---- manual usage (capability-limited providers, M8.5) -------------------
 
 export interface ManualUsageRow {
@@ -400,11 +426,37 @@ function rowToManualUsage(r: Record<string, unknown>): ManualUsageRow {
  * Persists the provider's current credential snapshot. The keys table holds a
  * single active key per provider, so any rows left over from a replaced key
  * are purged in the same transaction — otherwise aggregate totals would keep
- * counting the abandoned key.
+ * counting the abandoned key. A key change also invalidates the provider's
+ * cached activity/rollups/settings, since those were derived from the old
+ * credential and cannot be attributed to the new one.
  */
 export async function upsertKeyRow(db: SqlDb, row: KeyRow): Promise<void> {
-  const provider = row.provider ?? DEFAULT_PROVIDER;
+  const provider = (row.provider ?? DEFAULT_PROVIDER) as ProviderId;
   await withTransaction(db, async () => {
+    const stale = await db.getFirstAsync<{ hash: string }>(
+      'SELECT hash FROM keys WHERE provider = ? AND hash <> ? LIMIT 1',
+      provider,
+      row.hash,
+    );
+    if (stale) {
+      await db.runAsync(
+        'DELETE FROM endpoint_activity WHERE provider = ? AND api_key_hash <> ?',
+        provider,
+        row.hash,
+      );
+      await db.runAsync('DELETE FROM daily_rollups WHERE provider = ?', provider);
+      await deleteProviderSettingsInTransaction(db, provider);
+      // v0.1 kept OpenRouter account/cache settings globally; Home still reads
+      // them as a fallback, so they must not resurrect the old key's totals.
+      if (provider === 'openrouter') {
+        await db.runAsync(
+          `DELETE FROM settings WHERE key IN (
+             'account.total_credits', 'account.total_usage', 'models_user_count',
+             'credential.key_hash', 'credential.key_prefix'
+           )`,
+        );
+      }
+    }
     await db.runAsync(
       'DELETE FROM keys WHERE provider = ? AND hash <> ?',
       provider,

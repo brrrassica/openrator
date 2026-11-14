@@ -7,11 +7,14 @@ import {
   getDailyRollups,
   getKeyRow,
   getKeyRows,
+  getProviderSetting,
   getSetting,
   listProvidersFromDb,
   migrate,
   pruneActivityOlderThan,
+  replaceDailyRollups,
   SCHEMA_VERSION,
+  setProviderSetting,
   setSetting,
   upsertActivityRows,
   upsertKeyRow,
@@ -406,6 +409,86 @@ describe('engine E2E over real SQLite (M5.4)', () => {
 
     expect((await getKeyRows(db, 'openrouter')).map((r) => r.hash)).toEqual(['new']);
     expect((await getKeyRows(db, 'opencode-zen')).map((r) => r.hash)).toEqual(['zen']);
+  });
+
+  it('replacing a key clears the old key activity, rollups, and account cache', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    const key = (provider: string, hash: string) => ({
+      provider,
+      hash,
+      label: hash,
+      isManagement: 0,
+      limit: 10,
+      limitRemaining: 4,
+      limitReset: null,
+      usageMonthly: 6,
+      usageDaily: 0,
+      usageWeekly: 0,
+      expiresAt: null,
+      updatedAt: '2026-10-05',
+    });
+    const activity = (provider: string, apiKeyHash: string): ActivityRow => ({
+      provider,
+      day: '2026-10-04',
+      endpoint: 'openai/gpt-4o-mini',
+      apiKeyHash,
+      requests: 1,
+      spendUsd: 1,
+      tokens: 10,
+    });
+    await upsertKeyRow(db, key('openrouter', 'old'));
+    await upsertKeyRow(db, key('opencode-zen', 'zen'));
+    await upsertActivityRows(db, [activity('openrouter', 'old'), activity('opencode-zen', 'zen')]);
+    await replaceDailyRollups(
+      db,
+      [
+        {
+          provider: 'openrouter',
+          day: '2026-10-04',
+          spendUsd: 1,
+          requests: 1,
+          tokens: 10,
+          byEndpoint: {},
+        },
+      ],
+      'openrouter',
+    );
+    await replaceDailyRollups(
+      db,
+      [
+        {
+          provider: 'opencode-zen',
+          day: '2026-10-04',
+          spendUsd: 1,
+          requests: 1,
+          tokens: 10,
+          byEndpoint: {},
+        },
+      ],
+      'opencode-zen',
+    );
+    await setProviderSetting(db, 'openrouter', 'account.total_credits', '65');
+    await setProviderSetting(db, 'openrouter', 'plan.window.monthly.used_pct', '100');
+    await setSetting(db, 'account.total_credits', '65');
+    await setSetting(db, 'credential.key_hash', 'old');
+
+    // A same-key refresh must not throw away the cache.
+    await upsertKeyRow(db, key('openrouter', 'old'));
+    expect(await getActivityRows(db, { provider: 'openrouter' })).toHaveLength(1);
+
+    await upsertKeyRow(db, key('openrouter', 'new'));
+
+    expect(await getActivityRows(db, { provider: 'openrouter' })).toHaveLength(0);
+    expect(await getActivityRows(db, { provider: 'opencode-zen' })).toHaveLength(1);
+    expect(await getDailyRollups(db, undefined, undefined, 'openrouter')).toHaveLength(0);
+    expect(await getDailyRollups(db, undefined, undefined, 'opencode-zen')).toHaveLength(1);
+    expect(await getProviderSetting(db, 'openrouter', 'account.total_credits')).toBeNull();
+    expect(
+      await getProviderSetting(db, 'openrouter', 'plan.window.monthly.used_pct'),
+    ).toBeNull();
+    expect(await getSetting(db, 'account.total_credits')).toBeNull();
+    expect(await getSetting(db, 'credential.key_hash')).toBeNull();
   });
 
   it('migrate upgrades a v1 database to the latest schema (WS2-3)', async () => {
