@@ -77,6 +77,8 @@ interface ServerState {
   presetRouting: PresetRouting;
   /** Force an HTTP status for /key (e.g. 402). */
   keyStatus?: number;
+  /** Return a 2xx with no parseable /key body. */
+  keyEmpty?: boolean;
   /** Force an HTTP status for /activity (e.g. 429/500). */
   activityStatus?: number;
   /** Force an HTTP status for /credits (e.g. 403). */
@@ -130,6 +132,7 @@ function makeServer(initial: Partial<ServerState> = {}): Server {
           state.keyStatus,
         );
       }
+      if (state.keyEmpty) return jsonRes(undefined);
       return jsonRes({
         data: {
           label: state.persona === 'mgmt' ? 'mgmt-fixture' : 'standard-fixture',
@@ -564,6 +567,31 @@ describe('scenario matrix — failure modes and malformed payloads', () => {
     // the other sources still refreshed
     expect(await getActivityRows(db)).toHaveLength(3);
     expect(engine.getStatus().activity.error).toBeUndefined();
+  });
+
+  it('an empty 2xx /key body persists a default key row instead of failing credits', async () => {
+    const server = makeServer({ persona: 'mgmt', keyEmpty: true });
+    const { db, engine } = await setup(server);
+
+    await expect(engine.refreshCredits()).resolves.toMatchObject({
+      label: '',
+      limit: 0,
+      limitRemaining: 0,
+      usageDaily: 0,
+      usageWeekly: 0,
+      usageMonthly: 0,
+    });
+    expect(engine.getStatus().credits.error).toBeUndefined();
+
+    const hash = (await getSetting(db, 'credential.key_hash')) ?? '';
+    expect(await getKeyRow(db, hash)).toMatchObject({
+      label: '',
+      limit: 0,
+      limitRemaining: 0,
+      usageDaily: 0,
+      usageWeekly: 0,
+      usageMonthly: 0,
+    });
   });
 
   it('429 on /activity surfaces after retries and leaves the cache intact', async () => {

@@ -127,6 +127,64 @@ describe('OpenRouterClient', () => {
     expect(page.data[0].requests).toBe(3);
   });
 
+  it('getActivity treats a 2xx without a JSON body as an empty page', async () => {
+    const { client } = makeClient(async () => ({
+      status: 200,
+      headers: { get: () => null },
+      json: async () => {
+        throw new Error('no body');
+      },
+    }));
+    await expect(client.getActivity({ date: '2026-10-04' })).resolves.toEqual({
+      data: [],
+      totalCount: undefined,
+      links: undefined,
+    });
+    await expect(client.getActivityAll()).resolves.toEqual({
+      data: [],
+      totalCount: undefined,
+      links: { next: null },
+    });
+  });
+
+  it('listModelsUser treats a 2xx without a JSON body as an empty page', async () => {
+    const { client } = makeClient(async () => ({
+      status: 200,
+      headers: { get: () => null },
+      json: async () => undefined,
+    }));
+    await expect(client.listModelsUser()).resolves.toEqual({ models: [], next: null });
+  });
+
+  it('getKeyStatus defaults required fields when /key has no JSON body', async () => {
+    const { client } = makeClient(async () => ({
+      status: 200,
+      headers: { get: () => null },
+      json: async () => undefined,
+    }));
+    const key = await client.getKeyStatus();
+    expect(key).toMatchObject({
+      label: '',
+      isManagementKey: false,
+      isProvisioningKey: false,
+      limit: 0,
+      limitReset: null,
+      limitRemaining: 0,
+      includeByokInLimit: false,
+      usage: 0,
+      usageDaily: 0,
+      usageWeekly: 0,
+      usageMonthly: 0,
+      byokUsage: 0,
+      byokUsageDaily: 0,
+      byokUsageWeekly: 0,
+      byokUsageMonthly: 0,
+      isFreeTier: false,
+      expiresAt: null,
+      freeModelDailyRequests: { used: 0, limit: 0, remaining: 0 },
+    });
+  });
+
   it('upsertPreset: POSTs chat-completions body with empty messages (cost-free contract)', async () => {
     const { client, calls } = makeClient(async (input, init) => {
       expect(input).toContain('/presets/my-policy/chat/completions');

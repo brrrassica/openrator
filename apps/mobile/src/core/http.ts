@@ -132,7 +132,10 @@ export class HttpClient {
           json = undefined;
         }
         if (res.status >= 200 && res.status < 300) {
-          return json as T;
+          // A 2xx is not a promise of a JSON body (204s, edge-proxy pages).
+          // Normalize a missing/null body to `{}` so typed callers always have
+          // a response record to read instead of dereferencing `undefined`.
+          return (json ?? {}) as T;
         }
         const err = mapHttpError(res.status, json, res.headers.get('Retry-After'));
         if (!err.retriable) throw err;
