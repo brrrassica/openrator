@@ -63,13 +63,36 @@ function pickList(raw: unknown): Record<string, unknown>[] {
 /** Picks snake_case keys from `src` into a camelCase object. */
 export function mapKeyStatus(src: Record<string, unknown>): KeyStatus {
   const k = mapObject(asRecord(src));
-  const f = (k.freeModelDailyRequests ?? {}) as Record<string, unknown>;
+  const f = asRecord(k.freeModelDailyRequests);
+  const num = (value: unknown): number => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const bool = (value: unknown): boolean =>
+    value === true || value === 1 || value === 'true';
   return {
     ...(k as unknown as KeyStatus),
+    label: typeof k.label === 'string' ? k.label : '',
+    isManagementKey: bool(k.isManagementKey),
+    isProvisioningKey: bool(k.isProvisioningKey),
+    limit: num(k.limit),
+    limitReset: (k.limitReset ?? null) as KeyStatus['limitReset'],
+    limitRemaining: num(k.limitRemaining),
+    includeByokInLimit: bool(k.includeByokInLimit),
+    usage: num(k.usage),
+    usageDaily: num(k.usageDaily),
+    usageWeekly: num(k.usageWeekly),
+    usageMonthly: num(k.usageMonthly),
+    byokUsage: num(k.byokUsage),
+    byokUsageDaily: num(k.byokUsageDaily),
+    byokUsageWeekly: num(k.byokUsageWeekly),
+    byokUsageMonthly: num(k.byokUsageMonthly),
+    isFreeTier: bool(k.isFreeTier),
+    expiresAt: typeof k.expiresAt === 'string' ? k.expiresAt : null,
     freeModelDailyRequests: {
-      used: Number(f.used ?? 0),
-      limit: Number(f.limit ?? 0),
-      remaining: Number(f.remaining ?? 0),
+      used: num(f.used),
+      limit: num(f.limit),
+      remaining: num(f.remaining),
     },
   };
 }
