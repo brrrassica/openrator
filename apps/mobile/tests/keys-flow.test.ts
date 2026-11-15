@@ -3,6 +3,7 @@ import {
   holdsSecret,
   initialRevealState,
   revealReducer,
+  runSingleFlight,
 } from '../src/ui/keys-flow';
 
 describe('create-key reveal flow (M4.5)', () => {
@@ -47,5 +48,30 @@ describe('create-key reveal flow (M4.5)', () => {
     s = revealReducer(s, { type: 'reveal', keyValue: 'b' });
     expect(s.keyValue).toBe('b');
     expect(s.copiedAt).toBeNull();
+  });
+
+  it('suppresses a second create before the first settles', async () => {
+    const inFlight = { current: false };
+    let calls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const create = async () => {
+      calls += 1;
+      await gate;
+    };
+
+    const first = runSingleFlight(inFlight, create);
+    const second = runSingleFlight(inFlight, create);
+    expect(calls).toBe(1);
+
+    release();
+    await Promise.all([first, second]);
+    // The guard clears after settling, so a later press still creates.
+    await runSingleFlight(inFlight, async () => {
+      calls += 1;
+    });
+    expect(calls).toBe(2);
   });
 });

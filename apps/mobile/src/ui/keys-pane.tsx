@@ -24,7 +24,7 @@ import { SyncEngine } from '../sync/sync-engine';
 import { ProviderId, ProviderManagement } from '../providers/types';
 import { AdminKey, KeyRow } from '../core/types';
 import { fmtUsd } from './chart-math';
-import { initialRevealState, revealReducer } from './keys-flow';
+import { initialRevealState, revealReducer, runSingleFlight } from './keys-flow';
 import { useTheme } from './theme';
 
 interface Props {
@@ -375,23 +375,26 @@ function CreateKeyForm({
   const [creating, setCreating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
+  // A repeat press racing the setCreating re-render must not mint a second key.
+  const inFlight = useRef(false);
 
-  const create = async () => {
-    setCreating(true);
-    setErr(null);
-    setTestResult(null);
-    try {
-      const created = await management.createKey({
-        label: label.trim() || undefined,
-        limit: limit.trim() ? Number(limit) : undefined,
-      });
-      dispatch({ type: 'reveal', keyValue: created.key });
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setCreating(false);
-    }
-  };
+  const create = () =>
+    runSingleFlight(inFlight, async () => {
+      setCreating(true);
+      setErr(null);
+      setTestResult(null);
+      try {
+        const created = await management.createKey({
+          label: label.trim() || undefined,
+          limit: limit.trim() ? Number(limit) : undefined,
+        });
+        dispatch({ type: 'reveal', keyValue: created.key });
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        setCreating(false);
+      }
+    });
 
   const test = async () => {
     if (!reveal.keyValue) return;

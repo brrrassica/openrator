@@ -54,3 +54,20 @@ export function revealReducer(state: RevealState, action: RevealAction): RevealS
 export function holdsSecret(state: RevealState): boolean {
   return state.keyValue !== null;
 }
+
+/**
+ * Run an async action at most once while a previous invocation is pending.
+ * The guard is synchronous, so a second tap in the same render tick is a no-op.
+ */
+export async function runSingleFlight(
+  guard: { current: boolean },
+  task: () => Promise<void>,
+): Promise<void> {
+  if (guard.current) return;
+  guard.current = true;
+  try {
+    await task();
+  } finally {
+    guard.current = false;
+  }
+}

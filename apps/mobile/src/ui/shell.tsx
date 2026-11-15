@@ -45,7 +45,7 @@ interface Props {
   db: SqlDb;
   creds: CredentialService;
   onSignOut?: () => void | Promise<void>;
-  onAccountsChanged?: () => void;
+  onAccountsChanged?: () => void | Promise<void>;
 }
 
 export default function Shell({ engine, db, creds, onSignOut, onAccountsChanged }: Props) {

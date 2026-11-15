@@ -92,7 +92,7 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderId, ProviderDescriptor> = {
     baseUrl: OPENCODE_BASE_URL,
     dashboardUrl: OPENCODE_DASHBOARD_URL,
     docsUrl: 'https://opencode.ai/docs',
-    keyPattern: /^[A-Za-z0-9._-]{16,}$/,
+    keyPattern: /^oc_sk_[A-Za-z0-9._-]{16,}$/,
     keyHint: 'Keys start with oc_sk_ and are issued by the OpenCode Console.',
     capabilities: GO_CAPS,
     supportsManagementKey: false,

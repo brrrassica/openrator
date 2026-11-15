@@ -3,7 +3,7 @@
  * tab shell with the Home Pane; sync engine runs behind the scenes.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CredentialService, createSecureKeyValueStore } from './src/core/credentials';
@@ -88,6 +88,16 @@ function Inner() {
   const [stage, setStage] = useState<Stage>('booting');
   const [engine, setEngine] = useState<SyncEngine | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // Track the live engine outside render state so a queued rebuild cannot stop
+  // a stale one, and run rebuilds one at a time so a later pass cannot replace
+  // an engine that is still running.
+  const engineRef = useRef<SyncEngine | null>(null);
+  const rebuildRef = useRef<Promise<void> | null>(null);
+
+  const installEngine = (next: SyncEngine | null) => {
+    engineRef.current = next;
+    setEngine(next);
+  };
 
   useEffect(() => {
     let cancel = false;
@@ -104,7 +114,7 @@ function Inner() {
         const providers = await creds.providersWithKeys();
         if (providers.length > 0) {
           const eng = await makeEngine(creds, db, setNote);
-          setEngine(eng);
+          installEngine(eng);
           eng.start(true);
           void eng.refreshAll();
           setStage('ready');
@@ -156,7 +166,7 @@ function Inner() {
         providers={listDescriptors()}
         onDone={async () => {
           const eng = await makeEngine(ctx.creds, ctx.db, setNote);
-          setEngine(eng);
+          installEngine(eng);
           eng.start(true);
           void eng.refreshAll();
           setStage('ready');
@@ -167,25 +177,34 @@ function Inner() {
   }
 
   if (stage === 'ready' && engine && ctx) {
-    const rebuild = async () => {
-      await engine.stop();
-      const providers = await ctx.creds.providersWithKeys();
-      if (providers.length === 0) {
-        setEngine(null);
-        setStage('onboarding');
-        return;
-      }
-      const next = await makeEngine(ctx.creds, ctx.db, setNote);
-      setEngine(next);
-      next.start(true);
-      void next.refreshAll();
+    const rebuild = (): Promise<void> => {
+      const run = (rebuildRef.current ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(async () => {
+          const current = engineRef.current;
+          if (current) await current.stop();
+          const providers = await ctx.creds.providersWithKeys();
+          if (providers.length === 0) {
+            installEngine(null);
+            setStage('onboarding');
+            return;
+          }
+          const next = await makeEngine(ctx.creds, ctx.db, setNote);
+          installEngine(next);
+          next.start(true);
+          void next.refreshAll();
+        });
+      rebuildRef.current = run;
+      return run.finally(() => {
+        if (rebuildRef.current === run) rebuildRef.current = null;
+      });
     };
     return (
       <Shell
         engine={engine}
         db={ctx.db}
         creds={ctx.creds}
-        onAccountsChanged={() => void rebuild()}
+        onAccountsChanged={rebuild}
         onSignOut={async () => {
           await engine.stop();
           try {
@@ -201,7 +220,7 @@ function Inner() {
             setNote(message);
             throw e;
           }
-          setEngine(null);
+          installEngine(null);
           setStage('onboarding');
         }}
       />
