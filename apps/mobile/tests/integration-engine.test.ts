@@ -3,10 +3,12 @@ import { DatabaseSync } from 'node:sqlite';
 import { SqlDb } from '../src/store/db';
 import {
   clearAllData,
+  deleteManualUsage,
   getActivityRows,
   getDailyRollups,
   getKeyRow,
   getKeyRows,
+  getManualUsage,
   getProviderSetting,
   getSetting,
   listProvidersFromDb,
@@ -18,6 +20,7 @@ import {
   setSetting,
   upsertActivityRows,
   upsertKeyRow,
+  upsertManualUsage,
   withTransaction,
 } from '../src/store/daos';
 import { SyncEngine } from '../src/sync/sync-engine';
@@ -384,6 +387,84 @@ describe('engine E2E over real SQLite (M5.4)', () => {
     expect(order).toEqual(['a-start', 'a-end', 'b-start', 'b-end']);
     expect(await getSetting(db, 'tx.a')).toBe('a');
     expect(await getSetting(db, 'tx.b')).toBe('b');
+  });
+
+  it('a manual usage save queues behind an open transaction and survives its rollback', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    let opened!: () => void;
+    const open = new Promise<void>((resolve) => {
+      opened = resolve;
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const failing = withTransaction(db, async () => {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        'sync.open',
+        '1',
+      );
+      opened();
+      await gate;
+      throw new Error('sync failed');
+    });
+    await open; // the sync transaction is now open on this connection
+
+    const saved = upsertManualUsage(db, {
+      provider: 'openrouter',
+      month: '2026-10',
+      amountUsd: 12.5,
+      note: 'manual',
+      updatedAt: '2026-10-06T00:00:00Z',
+    });
+    await Promise.resolve(); // an unqueued write would run inside the open tx
+    release();
+    await expect(failing).rejects.toThrow('sync failed');
+    await saved;
+
+    expect(await getManualUsage(db, 'openrouter', '2026-10')).not.toBeNull();
+    expect(await getSetting(db, 'sync.open')).toBeNull(); // the sync write rolled back
+  });
+
+  it('a manual usage delete queues behind an open transaction and is not undone by its rollback', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    await upsertManualUsage(db, {
+      provider: 'openrouter',
+      month: '2026-10',
+      amountUsd: 12.5,
+      note: 'manual',
+      updatedAt: '2026-10-06T00:00:00Z',
+    });
+    let opened!: () => void;
+    const open = new Promise<void>((resolve) => {
+      opened = resolve;
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const failing = withTransaction(db, async () => {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        'sync.open',
+        '1',
+      );
+      opened();
+      await gate;
+      throw new Error('sync failed');
+    });
+    await open;
+
+    const removed = deleteManualUsage(db, 'openrouter', '2026-10');
+    await Promise.resolve(); // an unqueued delete would run inside the open tx
+    release();
+    await expect(failing).rejects.toThrow('sync failed');
+    await removed;
+
+    expect(await getManualUsage(db, 'openrouter', '2026-10')).toBeNull();
   });
 
   it('replacing a key purges stale rows for that provider only', async () => {

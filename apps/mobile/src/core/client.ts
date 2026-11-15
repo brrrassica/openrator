@@ -6,6 +6,7 @@
  */
 
 import { OPENROUTER_BASE_URL, POLL } from './config';
+import { OpenRouterApiError } from './errors';
 import { FetchLike, HttpClient, isSameOriginUrl } from './http';
 import {
   ActivityPage,
@@ -307,9 +308,23 @@ export class OpenRouterClient {
     if (body.includeByokInLimit !== undefined) wire.include_byok_in_limit = body.includeByokInLimit;
     if (body.expiresAt !== undefined) wire.expires_at = body.expiresAt;
     return this.singleFlight(() =>
-      this.request<{ data?: unknown }>('POST', '/keys', wire).then((r) =>
-        mapAs<AdminKeyCreated>(asRecord(r?.data)),
-      ),
+      this.request<{ data?: unknown }>('POST', '/keys', wire).then((r) => {
+        const created = mapAs<AdminKeyCreated>(asRecord(r?.data));
+        if (typeof created.key !== 'string' || created.key.length === 0) {
+          // The server may have minted a key even though its one-time secret
+          // was dropped by a proxy/partial response. Surface that as a hard
+          // failure so the user is told to revoke it instead of seeing a
+          // silent no-op in the reveal form.
+          throw new OpenRouterApiError({
+            status: 502,
+            message:
+              'The key was created but the API did not return its secret. ' +
+              'Revoke the new key and try again.',
+            retriable: false,
+          });
+        }
+        return created;
+      }),
     );
   }
 
