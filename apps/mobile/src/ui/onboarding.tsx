@@ -4,7 +4,7 @@
  * logged; format-gated before save; paste-warn note inline.
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { CredentialService } from '../core/credentials';
 import { listDescriptors, getDescriptor } from '../providers/registry';
@@ -15,7 +15,7 @@ import { useTheme } from './theme';
 interface Props {
   creds: CredentialService;
   providers?: ProviderDescriptor[];
-  onDone: () => void;
+  onDone: () => Promise<void>;
   onError?: (message: string) => void;
 }
 
@@ -32,24 +32,30 @@ export default function OnboardingScreen({
   const [isMgmt, setIsMgmt] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Second guard: a press racing the setBusy re-render must not start another save.
+  const inFlight = useRef(false);
 
   const provider = getDescriptor(providerId);
   const valid = provider.keyPattern.test(key.trim());
 
   async function save() {
-    if (!valid || busy) return;
+    if (!valid || busy || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setErr(null);
     try {
       await creds.saveKey(key, provider.supportsManagementKey ? isMgmt : false, providerId);
       await creds.saveLabel(label, providerId);
-      onDone();
+      // Stay busy until the engine is installed so a second tap cannot build
+      // a duplicate SyncEngine, and surface makeEngine failures below.
+      await onDone();
     } catch (e) {
       // WS2-7: a failed secure-store write must be surfaced; we do NOT advance.
       const msg = e instanceof Error ? e.message : String(e);
       setErr(msg);
       onError?.(msg);
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
