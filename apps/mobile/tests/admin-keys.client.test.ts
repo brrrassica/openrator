@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OpenRouterClient, testRawKey } from '../src/core/client';
+import { OpenRouterApiError } from '../src/core/errors';
 
 interface FakeRes {
   status: number;
@@ -79,6 +80,13 @@ describe('management-key plane (client)', () => {
     const created = await client.createAdminKey({ label: 't', limit: 5 });
     expect(created.key).toBe('sk-or-v1-created-secret');
     expect(calls()).toHaveLength(1);
+  });
+
+  it('rejects a 2xx POST /keys response that omits the one-time secret', async () => {
+    const { client } = makeAdminClient(async () => res(200, {}));
+    const err = await client.createAdminKey({ label: 't' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OpenRouterApiError);
+    expect((err as Error).message).toContain('did not return its secret');
   });
 
   it('patches label/limit by hash with snake_case body', async () => {

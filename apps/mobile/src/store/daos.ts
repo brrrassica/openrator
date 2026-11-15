@@ -356,16 +356,20 @@ export interface ManualUsageRow {
 
 /** Insert or replace one provider's manual amount for a month. */
 export async function upsertManualUsage(db: SqlDb, row: ManualUsageRow): Promise<void> {
-  await db.runAsync(
-    `INSERT OR REPLACE INTO usage_manual
-       (provider, month, amount_usd, note, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    row.provider,
-    row.month,
-    row.amountUsd,
-    row.note ?? null,
-    row.updatedAt,
-  );
+  // Route through the shared transaction queue so this save can never join a
+  // sync transaction and be rolled back with it after reporting success.
+  await withTransaction(db, async () => {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO usage_manual
+         (provider, month, amount_usd, note, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      row.provider,
+      row.month,
+      row.amountUsd,
+      row.note ?? null,
+      row.updatedAt,
+    );
+  });
 }
 
 export async function getManualUsage(
@@ -399,15 +403,17 @@ export async function deleteManualUsage(
   provider: string,
   month?: string,
 ): Promise<void> {
-  if (month) {
-    await db.runAsync(
-      'DELETE FROM usage_manual WHERE provider = ? AND month = ?',
-      provider,
-      month,
-    );
-    return;
-  }
-  await db.runAsync('DELETE FROM usage_manual WHERE provider = ?', provider);
+  await withTransaction(db, async () => {
+    if (month) {
+      await db.runAsync(
+        'DELETE FROM usage_manual WHERE provider = ? AND month = ?',
+        provider,
+        month,
+      );
+      return;
+    }
+    await db.runAsync('DELETE FROM usage_manual WHERE provider = ?', provider);
+  });
 }
 
 function rowToManualUsage(r: Record<string, unknown>): ManualUsageRow {
