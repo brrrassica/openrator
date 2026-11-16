@@ -87,6 +87,10 @@ describe('provider registry (M7.2 / M8)', () => {
     expect(go.capabilities.subscriptionPlan).toBe(true);
     expect(go.capabilities.planWindows).toBe(true);
     expect(go.capabilities.activityHistory).toBe(false);
+    // The documented oc_sk_ prefix keeps an OpenRouter key from validating
+    // against the OpenCode Go descriptor after a provider switch.
+    expect(go.keyPattern.test('oc_sk_abcdefghijklmnop')).toBe(true);
+    expect(go.keyPattern.test('sk-or-v1-abcdef-0123456789abcdefghij')).toBe(false);
 
     const zen = getDescriptor('opencode-zen');
     expect(zen.enabled).toBe(true);

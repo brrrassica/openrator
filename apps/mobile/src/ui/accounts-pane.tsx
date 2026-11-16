@@ -4,7 +4,7 @@
  * trigger a full sign-out. Raw keys are written only to secure storage.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CredentialService } from '../core/credentials';
 import {
@@ -23,7 +23,7 @@ interface Props {
   engine: SyncEngine;
   db: SqlDb;
   creds: CredentialService;
-  onAccountsChanged?: () => void;
+  onAccountsChanged?: () => void | Promise<void>;
   onSignOut?: () => void | Promise<void>;
 }
 
@@ -43,6 +43,9 @@ export default function AccountsPane({
   const [hasStoredMgmt, setHasStoredMgmt] = useState(false);
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  // Synchronous guard: a second press in the same render tick must not start a
+  // credential write while the first mutation is still stopping the engine.
+  const busyRef = useRef(false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manualAmount, setManualAmount] = useState('');
@@ -103,11 +106,12 @@ export default function AccountsPane({
   }, [creds, selected]);
 
   const add = async () => {
-    if (busy || !descriptor) return;
+    if (busy || busyRef.current || !descriptor) return;
     if (!descriptor.keyPattern.test(key.trim())) {
       setError(descriptor.keyHint);
       return;
     }
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -121,32 +125,36 @@ export default function AccountsPane({
       setKey('');
       setMgmtKey('');
       await load();
-      onAccountsChanged?.();
+      await onAccountsChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
   const removeManagementKey = async () => {
-    if (busy || !descriptor) return;
+    if (busy || busyRef.current || !descriptor) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
       await creds.saveManagementKey(null, selected);
       setHasStoredMgmt(false);
       setMgmtKey('');
-      onAccountsChanged?.();
+      await onAccountsChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
   const saveManual = async () => {
-    if (busy || !descriptor) return;
+    if (busy || busyRef.current || !descriptor) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -159,15 +167,18 @@ export default function AccountsPane({
         updatedAt: new Date().toISOString(),
       });
       setManualSaved(true);
-      onAccountsChanged?.();
+      await onAccountsChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
   const remove = async (id: ProviderId) => {
+    if (busy || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -179,13 +190,14 @@ export default function AccountsPane({
       await creds.clearProvider(id);
       await clearAllData(db, id);
       await load();
-      onAccountsChanged?.();
+      await onAccountsChanged?.();
     } catch (e) {
       // The engine may already be stopped when a teardown step throws; keep
       // background sync for the remaining providers alive.
       engine.start(true);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -260,7 +272,10 @@ export default function AccountsPane({
                 key={p.id}
                 style={[styles.segment, { borderColor: active ? t.accent : t.border }]}
                 onPress={() => {
+                  if (p.id === selected) return;
                   setSelected(p.id);
+                  setKey('');
+                  setMgmtKey('');
                   setError(null);
                 }}
                 accessibilityRole="radio"

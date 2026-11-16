@@ -88,8 +88,12 @@ export default function OnboardingScreen({
                     { borderColor: active ? t.accent : t.border, backgroundColor: t.card },
                   ]}
                   onPress={() => {
+                    if (p.id === providerId) return;
                     setProviderId(p.id);
+                    setKey('');
+                    setLabel('');
                     setIsMgmt(false);
+                    setErr(null);
                   }}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: active }}
