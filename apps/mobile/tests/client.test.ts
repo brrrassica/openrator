@@ -315,6 +315,36 @@ describe('OpenRouterClient', () => {
     expect(calls).toBe(2);
   });
 
+  it('does not leak an unhandled rejection when a timed-out fetch later aborts (issue #55)', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (e: unknown) => unhandled.push(e);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      let calls = 0;
+      const client = new OpenRouterClient({
+        apiKey: 'sk-or-v1-test-key-0123456789abcdef',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        timeoutMs: 10,
+        maxRetries: 2,
+        fetchFn: async (_input, init) => {
+          calls++;
+          // simulate a real fetch: rejects with AbortError once aborted
+          const signal = (init as { signal?: AbortSignal } | undefined)?.signal;
+          return new Promise<never>((_, reject) => {
+            signal?.addEventListener('abort', () => reject(new Error('AbortError')));
+          });
+        },
+      });
+      await expect(client.getCredits()).rejects.toBeInstanceOf(OpenRouterNetworkError);
+      expect(calls).toBe(3); // every retry attempt idempotently timed out
+      // yield so any losing-side rejection would surface
+      await new Promise((r) => setTimeout(r, 50));
+      expect(unhandled).toHaveLength(0);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
+
   it('getActivityAll follows links.next across pages', async () => {
     const { client, calls } = makeClient(async (input) => {
       if (input.includes('cursor=page2')) {

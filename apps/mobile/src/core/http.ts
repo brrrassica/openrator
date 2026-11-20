@@ -110,21 +110,24 @@ export class HttpClient {
           reject(new OpenRouterNetworkError('request timed out'));
         }, this.timeoutMs);
       });
+      const pending = this.fetchFn(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${this.opts.apiKey}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(this.opts.headers ?? {}),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: controller.signal,
+      });
+      // The timer aborts the controller, so a fetch that loses the race
+      // rejects with an AbortError nobody awaits. Swallow it (registered
+      // before the race) so every timeout — including each retried attempt
+      // — does not surface an unhandled promise rejection.
+      pending.catch(() => undefined);
       try {
-        const res = await Promise.race([
-          this.fetchFn(url, {
-            method,
-            headers: {
-              Authorization: `Bearer ${this.opts.apiKey}`,
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-              ...(this.opts.headers ?? {}),
-            },
-            body: body === undefined ? undefined : JSON.stringify(body),
-            signal: controller.signal,
-          }),
-          timeout,
-        ]);
+        const res = await Promise.race([pending, timeout]);
         let json: unknown;
         try {
           json = await res.json();
