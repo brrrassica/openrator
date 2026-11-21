@@ -206,18 +206,27 @@ function makeServer(initial: Partial<ServerState> = {}): Server {
         });
       }
       if (state.paginated) {
+        const date = url.searchParams.get('date');
         const cursor = url.searchParams.get('cursor');
-        if (cursor === 'page2') {
+        const dayRows = date ? ACTIVITY.filter((r) => r.date === date) : ACTIVITY;
+        if (dayRows.length > 1) {
+          if (cursor === 'page2') {
+            return jsonRes({
+              data: dayRows.slice(1).map((r) => ({ ...r })),
+              total_count: dayRows.length,
+              links: { next: null },
+            });
+          }
           return jsonRes({
-            data: [{ ...ACTIVITY[2] }],
-            total_count: 2,
-            links: { next: null },
+            data: [{ ...dayRows[0] }],
+            total_count: dayRows.length,
+            links: { next: 'page2' },
           });
         }
         return jsonRes({
-          data: [{ ...ACTIVITY[0] }],
-          total_count: 2,
-          links: { next: 'page2' },
+          data: dayRows.map((r) => ({ ...r })),
+          total_count: dayRows.length,
+          links: { next: null },
         });
       }
       return jsonRes({ data: ACTIVITY, total_count: ACTIVITY.length });
@@ -529,7 +538,10 @@ describe('scenario matrix — offline and pagination', () => {
 
     await engine.refreshActivity();
     const rows: ActivityRow[] = await getActivityRows(db);
-    expect(rows.map((r) => r.day).sort()).toEqual([DAYS.today, DAYS.yesterday].sort());
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.day).sort()).toEqual(
+      [DAYS.today, DAYS.today, DAYS.yesterday].sort(),
+    );
     expect(server.log.filter((l) => l.includes('cursor=page2')).length).toBe(1);
   });
 

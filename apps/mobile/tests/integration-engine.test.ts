@@ -28,6 +28,7 @@ import { CredentialService, MemoryKeyValueStore } from '../src/core/credentials'
 import { OpenRouterClient } from '../src/core/client';
 import { ActivityRow, Provider } from '../src/core/types';
 import { computeSpendSummary } from '../src/ui/spend-summary';
+import { addDays, fmtDay } from '../src/sync/rollups';
 
 /**
  * Fixture-driven engine E2E (M5.4): real SQLite (node:sqlite) + a scripted
@@ -291,33 +292,50 @@ describe('engine E2E over real SQLite (M5.4)', () => {
     await migrate(db);
     const creds = new CredentialService(new MemoryKeyValueStore());
     await creds.saveKey(FIXTURE_KEY, true);
+    const today = fmtDay(new Date());
+    const yesterday = addDays(today, -1);
     const client = new OpenRouterClient({
       apiKey: FIXTURE_KEY,
       baseUrl: 'https://openrouter.ai/api/v1',
       fetchFn: async (input: string) => {
-        if (input.includes('cursor=page2')) {
+        const url = String(input);
+        if (url.includes(`date=${yesterday}`)) {
+          if (url.includes('cursor=page2')) {
+            return res({
+              data: [
+                { date: yesterday, endpoint: 'openai/gpt-4o-mini', api_key_hash: 'h1', requests: 5, spend_usd: 0.75, tokens: 2100 },
+              ],
+              total_count: 2,
+              links: { next: null },
+            });
+          }
           return res({
             data: [
-              { date: '2026-10-05', endpoint: 'openai/gpt-4o-mini', api_key_hash: 'h1', requests: 5, spend_usd: 0.75, tokens: 2100 },
+              { date: yesterday, endpoint: 'openai/gpt-4o-mini', api_key_hash: 'h1', requests: 12, spend_usd: 1.0, tokens: 4000 },
             ],
             total_count: 2,
+            links: { next: 'page2' },
+          });
+        }
+        if (url.includes(`date=${today}`)) {
+          return res({
+            data: [
+              { date: today, endpoint: 'openai/gpt-4o-mini', api_key_hash: 'h1', requests: 1, spend_usd: 0.1, tokens: 100 },
+            ],
+            total_count: 1,
             links: { next: null },
           });
         }
-        return res({
-          data: [
-            { date: '2026-10-04', endpoint: 'openai/gpt-4o-mini', api_key_hash: 'h1', requests: 12, spend_usd: 1.0, tokens: 4000 },
-          ],
-          total_count: 2,
-          links: { next: 'page2' },
-        });
+        return res({ data: [], total_count: 0, links: { next: null } });
       },
     });
     const engine = new SyncEngine(client, creds, db, {});
     await engine.refreshActivity();
     const rows = await getActivityRows(db);
-    expect(rows).toHaveLength(2);
-    expect(rows.map((r) => r.day).sort()).toEqual(['2026-10-04', '2026-10-05']);
+    const days = rows.map((r) => r.day).sort();
+    expect(days).toEqual([yesterday, today].sort());
+    expect(rows.filter((r) => r.day === yesterday)).toHaveLength(2);
+    expect(rows.filter((r) => r.day === today)).toHaveLength(1);
   });
 
   it('refreshAll is failure-isolated: a credits failure still syncs other sources', async () => {

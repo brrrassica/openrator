@@ -216,18 +216,22 @@ describe('provider adapters (M7.3/M7.9)', () => {
           return fakeRes(200, { data: { total_credits: 20, total_usage: 6 } });
         }
         if (input.includes('/activity')) {
-          return fakeRes(200, {
-            data: [
-              {
-                date: '2026-10-04',
-                endpoint: 'openai/gpt-4o-mini',
-                api_key_hash: 'h',
-                requests: 2,
-                spend_usd: 0.5,
-                tokens: 100,
-              },
-            ],
-          });
+          const url = String(input);
+          if (url.includes('date=2026-10-04')) {
+            return fakeRes(200, {
+              data: [
+                {
+                  date: '2026-10-04',
+                  endpoint: 'openai/gpt-4o-mini',
+                  api_key_hash: 'h',
+                  requests: 2,
+                  spend_usd: 0.5,
+                  tokens: 100,
+                },
+              ],
+            });
+          }
+          return fakeRes(200, { data: [] });
         }
         return fakeRes(200, { data: [] });
       },
