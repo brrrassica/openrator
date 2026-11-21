@@ -144,6 +144,7 @@ describe('§11 criterion 7 fails closed (M5.5 regression guard)', () => {
         buildId: 'abc',
         commit: '805ac83',
         sha256: '0048671caed2ca7cd69dc8ba7d41080c6a8e41864214ca68f1d7186b41f3500b',
+        apkUrl: 'https://example.com/app.apk',
       },
     });
     expect(check.row.automated).toBe(false);

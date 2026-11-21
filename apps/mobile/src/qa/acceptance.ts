@@ -61,6 +61,7 @@ export interface ReleaseRecordFacts {
   buildId?: string;
   commit?: string;
   sha256?: string;
+  apkUrl?: string;
 }
 
 /** Build/config facts used by §11 criterion 7 (supplied by the test tree). */
@@ -490,7 +491,11 @@ function checkBuildInstall(f: AcceptanceFixtures): AcceptanceCheck {
   if (sourceOnly) {
     assertions.push({
       name: 'source-only release records no fabricated APK identity',
-      ok: !build.release.buildId && !build.release.commit && !build.release.sha256,
+      ok:
+        !build.release.buildId &&
+        !build.release.commit &&
+        !build.release.sha256 &&
+        !build.release.apkUrl,
       detail: 'APK identity pending build',
     });
   } else {
