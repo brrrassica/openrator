@@ -112,8 +112,16 @@ export class CredentialService {
   ): Promise<void> {
     const trimmed = key.trim();
     if (!trimmed) throw new Error('Key must not be empty');
-    await this.store.set(keyName(provider), trimmed);
+    // Flag first, key last: the key write is the commit point. If the key
+    // write fails, roll the flag back so hasKey()/isManagementFlag() never
+    // observe a credential stored with a stale or missing management flag.
     await this.store.set(flagName(provider), isManagement ? '1' : '0');
+    try {
+      await this.store.set(keyName(provider), trimmed);
+    } catch (e) {
+      await this.store.delete(flagName(provider)).catch(() => undefined);
+      throw e;
+    }
   }
 
   async getKey(provider: ProviderId = 'openrouter'): Promise<string | null> {

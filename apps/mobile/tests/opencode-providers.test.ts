@@ -315,4 +315,35 @@ describe('sync engine persists OpenCode Go plan windows (M8)', () => {
       await getProviderSetting(db, 'opencode-go', 'plan.window.five_hour.used_pct'),
     ).toBeNull();
   });
+
+  it('clears the stale plan card when a snapshot omits the plan (issue #59)', async () => {
+    const db = new NodeSqlite();
+    await migrate(db);
+    const creds = new CredentialService(new MemoryKeyValueStore());
+    await creds.saveKey('go-fixture-key-0123456789', false, 'opencode-go');
+
+    const full = new OpenCodeGoAdapter({
+      account: { label: 'Go fixture' },
+      plan: {
+        name: 'OpenCode Go Pro',
+        status: 'active',
+        renewsAt: '2026-12-01',
+        amountUsd: 20,
+        windows: [{ window: 'monthly', usedPct: 25 }],
+      },
+    });
+    await new SyncEngine([full], creds, db, {}).refreshCredits('opencode-go');
+    expect(await getProviderSetting(db, 'opencode-go', 'account.plan_name')).toBe(
+      'OpenCode Go Pro',
+    );
+
+    // A later snapshot without a plan must hide the card, not keep the old
+    // name/status/renewal values in settings.
+    const planless = new OpenCodeGoAdapter({ account: { label: 'Go fixture' } });
+    await new SyncEngine([planless], creds, db, {}).refreshCredits('opencode-go');    expect(await getProviderSetting(db, 'opencode-go', 'account.plan_name')).toBeNull();
+    expect(await getProviderSetting(db, 'opencode-go', 'account.plan_status')).toBeNull();
+    expect(await getProviderSetting(db, 'opencode-go', 'account.plan_renews_at')).toBeNull();
+    expect(await getProviderSetting(db, 'opencode-go', 'account.plan_amount_usd')).toBeNull();
+    expect(await getProviderSetting(db, 'opencode-go', 'plan.window.monthly.used_pct')).toBeNull();
+  });
 });

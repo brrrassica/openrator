@@ -265,6 +265,13 @@ export class SyncEngine {
         for (const entry of planWindowSettingEntries(windows)) {
           await setProviderSetting(this.db, provider, entry.key, entry.value);
         }
+      } else {
+        // Same rule as the windows: a snapshot that omits the plan entirely
+        // must remove the old plan card (name/status/renewal/amount) too,
+        // or buildPlanInfo keeps rendering a plan the provider no longer
+        // reports. `account.plan_` covers exactly the keys written by
+        // planInfoSettingEntries.
+        await deleteProviderSettings(this.db, provider, 'account.plan_');
       }
 
       // Preserve v0.1 global settings for the primary provider and legacy UI.
