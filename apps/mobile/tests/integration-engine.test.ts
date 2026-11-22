@@ -303,7 +303,7 @@ describe('engine E2E over real SQLite (M5.4)', () => {
           if (url.includes('cursor=page2')) {
             return res({
               data: [
-                { date: yesterday, endpoint: 'openai/gpt-4o-mini', api_key_hash: 'h1', requests: 5, spend_usd: 0.75, tokens: 2100 },
+                { date: yesterday, endpoint: 'openai/gpt-4o-mini', api_key_hash: 'h2', requests: 5, spend_usd: 0.75, tokens: 2100 },
               ],
               total_count: 2,
               links: { next: null },
