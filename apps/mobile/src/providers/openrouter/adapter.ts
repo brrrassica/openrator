@@ -11,6 +11,7 @@ import { shortHash } from '../../core/fingerprint';
 import { AdminKey, AdminKeyCreated, Preset, PresetConfig } from '../../core/types';
 import { FetchLike } from '../../core/http';
 import { getDescriptor } from '../registry';
+import { addDays } from '../../sync/rollups';
 import {
   AccountSnapshot,
   ProviderAdapter,
@@ -142,21 +143,26 @@ export class OpenRouterAdapter implements ProviderAdapter {
 
   async getUsage(
     credential: ProviderCredential,
-    _range: UsageRange,
+    range: UsageRange,
   ): Promise<UsageRecord[]> {
-    const page = await this.client(credential, true).getActivityAll();
+    const client = this.client(credential, true);
     const out: UsageRecord[] = [];
-    for (const rec of page.data) {
-      if (!rec.date || !/^\d{4}-\d{2}-\d{2}$/.test(rec.date)) continue;
-      out.push({
-        provider: this.id,
-        day: rec.date,
-        endpoint: rec.endpoint && rec.endpoint.length ? rec.endpoint : 'unknown',
-        apiKeyHash: String(rec.apiKeyHash ?? ''),
-        requests: Math.max(0, Math.round(Number(rec.requests ?? 0))),
-        spendUsd: Math.max(0, Number(rec.spendUsd ?? rec.spend_usd ?? 0)),
-        tokens: Math.max(0, Math.round(Number(rec.tokens ?? 0))),
-      });
+    for (let day = range.fromDay; day <= range.toDay; day = addDays(day, 1)) {
+      const page = await client.getActivityAll({ date: day });
+      for (const rec of page.data) {
+        if (!rec.date || !/^\d{4}-\d{2}-\d{2}$/.test(rec.date)) continue;
+        if (rec.date !== day) continue;
+        out.push({
+          provider: this.id,
+          day: rec.date,
+          endpoint: rec.endpoint && rec.endpoint.length ? rec.endpoint : 'unknown',
+          apiKeyHash: String(rec.apiKeyHash ?? ''),
+          requests: Math.max(0, Math.round(Number(rec.requests ?? 0))),
+          spendUsd: Math.max(0, Number(rec.spendUsd ?? rec.spend_usd ?? 0)),
+          tokens: Math.max(0, Math.round(Number(rec.tokens ?? 0))),
+        });
+      }
+      if (day === range.toDay) break;
     }
     return out;
   }
