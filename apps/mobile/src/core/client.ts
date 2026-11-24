@@ -145,9 +145,13 @@ export class OpenRouterClient {
     return this.singleFlight(() =>
       this.request<{ data?: unknown }>('GET', '/credits').then((r) => {
         const src = mapAs<Credits>(asRecord(r?.data));
+        const num = (v: unknown): number => {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : 0;
+        };
         return {
-          totalCredits: Number(src.totalCredits ?? 0),
-          totalUsage: Number(src.totalUsage ?? 0),
+          totalCredits: num(src.totalCredits ?? 0),
+          totalUsage: num(src.totalUsage ?? 0),
         };
       }),
     );

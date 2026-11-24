@@ -24,13 +24,17 @@ export function toActivityRow(
   if (!rec.date || !isDay(rec.date)) return null;
   const endpoint = rec.endpoint && rec.endpoint.length ? rec.endpoint : 'unknown';
   const pick = (camel: string, snake: string): unknown => rec[camel] ?? rec[snake];
+  const num = (v: unknown): number => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
   const row: ActivityRow = {
     day: rec.date,
     endpoint,
     apiKeyHash: String(rec.apiKeyHash ?? ''),
-    requests: Math.max(0, Math.round(Number(pick('requests', 'requests') ?? 0))),
-    spendUsd: Math.max(0, Number(pick('spendUsd', 'spend_usd') ?? 0)),
-    tokens: Math.max(0, Math.round(Number(pick('tokens', 'tokens') ?? 0))),
+    requests: Math.max(0, Math.round(num(pick('requests', 'requests') ?? 0))),
+    spendUsd: Math.max(0, num(pick('spendUsd', 'spend_usd') ?? 0)),
+    tokens: Math.max(0, Math.round(num(pick('tokens', 'tokens') ?? 0))),
   };
   if (provider) row.provider = provider;
   return row;
