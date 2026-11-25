@@ -249,27 +249,29 @@ export async function withTransaction<T>(db: SqlDb, fn: () => Promise<T>): Promi
  * are cleared separately after the secure store empties.
  */
 export async function clearAllData(db: SqlDb, provider?: ProviderId): Promise<void> {
-  const where = provider ? ' WHERE provider = ?' : '';
-  const params = provider ? [provider] : [];
-  for (const table of ['endpoint_activity', 'daily_rollups', 'provider_snapshot', 'keys', 'usage_manual']) {
-    await db.runAsync(`DELETE FROM ${table}${where}`, ...params);
-  }
-  if (provider) {
-    await db.runAsync('DELETE FROM settings WHERE key LIKE ?', `provider.${provider}.%`);
-    // v0.1 only persisted OpenRouter account/cache settings globally and Home
-    // still reads them as a fallback. Remove them with the provider so a
-    // re-added account cannot display the previous key or balance.
-    if (provider === 'openrouter') {
-      await db.runAsync(
-        `DELETE FROM settings WHERE key IN (
-           'account.total_credits', 'account.total_usage', 'models_user_count',
-           'credential.key_hash', 'credential.key_prefix'
-         )`,
-      );
+  await withTransaction(db, async () => {
+    const where = provider ? ' WHERE provider = ?' : '';
+    const params = provider ? [provider] : [];
+    for (const table of ['endpoint_activity', 'daily_rollups', 'provider_snapshot', 'keys', 'usage_manual']) {
+      await db.runAsync(`DELETE FROM ${table}${where}`, ...params);
     }
-  } else {
-    await db.runAsync("DELETE FROM settings WHERE key NOT LIKE 'credential.%'");
-  }
+    if (provider) {
+      await db.runAsync('DELETE FROM settings WHERE key LIKE ?', `provider.${provider}.%`);
+      // v0.1 only persisted OpenRouter account/cache settings globally and Home
+      // still reads them as a fallback. Remove them with the provider so a
+      // re-added account cannot display the previous key or balance.
+      if (provider === 'openrouter') {
+        await db.runAsync(
+          `DELETE FROM settings WHERE key IN (
+             'account.total_credits', 'account.total_usage', 'models_user_count',
+             'credential.key_hash', 'credential.key_prefix'
+           )`,
+        );
+      }
+    } else {
+      await db.runAsync("DELETE FROM settings WHERE key NOT LIKE 'credential.%'");
+    }
+  });
 }
 
 // ---- settings ------------------------------------------------------------
@@ -701,7 +703,7 @@ export async function getDailyRollups(
     spendUsd: Number(r.spend_usd),
     requests: Number(r.requests),
     tokens: Number(r.tokens),
-    byEndpoint: JSON.parse(String(r.by_endpoint ?? '{}')) as DailyRollup['byEndpoint'],
+    byEndpoint: parseByEndpoint(r.by_endpoint),
   }));
 }
 
@@ -758,6 +760,18 @@ function parseRegions(raw: unknown): string[] {
     return Array.isArray(parsed) ? (parsed as string[]) : [];
   } catch {
     return [];
+  }
+}
+
+function parseByEndpoint(raw: unknown): DailyRollup['byEndpoint'] {
+  if (typeof raw !== 'string') return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as DailyRollup['byEndpoint'])
+      : {};
+  } catch {
+    return {};
   }
 }
 
